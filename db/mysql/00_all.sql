@@ -29,7 +29,7 @@ CREATE TABLE friendships (
   
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY uniq_friendship (LEAST(user_id, friend_id), GREATEST(user_id, friend_id)),
+  UNIQUE KEY uniq_friendship (user_id, friend_id),
   INDEX idx_user_status (user_id, status),
   INDEX idx_friend_status (friend_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
