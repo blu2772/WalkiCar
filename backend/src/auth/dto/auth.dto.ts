@@ -1,32 +1,25 @@
-import { IsString, IsNotEmpty, IsEmail, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class AppleSignInDto {
+export class LoginDto {
   @ApiProperty({ description: 'Apple identity token' })
   @IsString()
-  @IsNotEmpty()
   identityToken: string;
 
-  @ApiProperty({ description: 'Apple authorization code' })
-  @IsString()
-  @IsNotEmpty()
-  authorizationCode: string;
-
-  @ApiProperty({ description: 'User email from Apple' })
-  @IsEmail()
+  @ApiPropertyOptional({ description: 'User display name' })
   @IsOptional()
-  email?: string;
-
-  @ApiProperty({ description: 'User full name from Apple' })
   @IsString()
+  displayName?: string;
+
+  @ApiPropertyOptional({ description: 'User avatar URL' })
   @IsOptional()
-  fullName?: string;
+  @IsString()
+  avatarUrl?: string;
 }
 
 export class RefreshTokenDto {
   @ApiProperty({ description: 'Refresh token' })
   @IsString()
-  @IsNotEmpty()
   refreshToken: string;
 }
 
@@ -40,8 +33,7 @@ export class AuthResponseDto {
   @ApiProperty({ description: 'User information' })
   user: {
     id: number;
-    appleSub: string;
-    displayName: string;
-    avatarUrl?: string;
+    display_name: string;
+    avatar_url?: string;
   };
 }

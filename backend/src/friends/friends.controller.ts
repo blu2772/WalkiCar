@@ -1,9 +1,8 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-
-import { FriendsService } from './friends.service';
-import { SendFriendRequestDto, RespondToFriendRequestDto, BlockUserDto, FriendshipDto } from './dto/friendship.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FriendsService } from './friends.service';
+import { CreateFriendshipDto, UpdateFriendshipDto, SearchUsersDto } from './dto/friends.dto';
 
 @ApiTags('Friends')
 @Controller('friends')
@@ -12,61 +11,59 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class FriendsController {
   constructor(private readonly friendsService: FriendsService) {}
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search for users' })
+  @ApiResponse({ status: 200, description: 'List of users matching search query' })
+  async searchUsers(@Query() query: SearchUsersDto, @Request() req) {
+    return this.friendsService.searchUsers(query.query, req.user.id);
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all friends' })
-  @ApiResponse({ status: 200, description: 'List of friends', type: [FriendshipDto] })
+  @ApiOperation({ summary: 'Get user friends' })
+  @ApiResponse({ status: 200, description: 'List of friends' })
   async getFriends(@Request() req) {
     return this.friendsService.getFriends(req.user.id);
   }
 
   @Get('requests')
-  @ApiOperation({ summary: 'Get incoming friend requests' })
-  @ApiResponse({ status: 200, description: 'List of incoming friend requests', type: [FriendshipDto] })
-  async getFriendRequests(@Request() req) {
-    return this.friendsService.getFriendRequests(req.user.id);
-  }
-
-  @Get('sent')
-  @ApiOperation({ summary: 'Get sent friend requests' })
-  @ApiResponse({ status: 200, description: 'List of sent friend requests', type: [FriendshipDto] })
-  async getSentRequests(@Request() req) {
-    return this.friendsService.getSentRequests(req.user.id);
+  @ApiOperation({ summary: 'Get pending friend requests' })
+  @ApiResponse({ status: 200, description: 'List of pending friend requests' })
+  async getPendingRequests(@Request() req) {
+    return this.friendsService.getPendingRequests(req.user.id);
   }
 
   @Post('requests')
   @ApiOperation({ summary: 'Send friend request' })
-  @ApiResponse({ status: 201, description: 'Friend request sent successfully', type: FriendshipDto })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async sendFriendRequest(@Body() dto: SendFriendRequestDto, @Request() req) {
-    return this.friendsService.sendFriendRequest(req.user.id, dto);
+  @ApiResponse({ status: 201, description: 'Friend request sent successfully' })
+  async sendFriendRequest(@Body() createFriendshipDto: CreateFriendshipDto, @Request() req) {
+    return this.friendsService.sendFriendRequest(req.user.id, createFriendshipDto.userId);
   }
 
-  @Post('requests/:id/respond')
-  @ApiOperation({ summary: 'Respond to friend request' })
-  @ApiResponse({ status: 200, description: 'Friend request responded successfully', type: FriendshipDto })
-  @ApiResponse({ status: 404, description: 'Friend request not found' })
-  async respondToFriendRequest(
-    @Param('id') id: string,
-    @Body() dto: RespondToFriendRequestDto,
-    @Request() req,
-  ) {
-    return this.friendsService.respondToFriendRequest(req.user.id, +id, dto);
+  @Patch('requests/:id/accept')
+  @ApiOperation({ summary: 'Accept friend request' })
+  @ApiResponse({ status: 200, description: 'Friend request accepted' })
+  async acceptFriendRequest(@Param('id') id: string, @Request() req) {
+    return this.friendsService.acceptFriendRequest(parseInt(id), req.user.id);
   }
 
-  @Post('block')
+  @Patch('requests/:id/reject')
+  @ApiOperation({ summary: 'Reject friend request' })
+  @ApiResponse({ status: 200, description: 'Friend request rejected' })
+  async rejectFriendRequest(@Param('id') id: string, @Request() req) {
+    return this.friendsService.rejectFriendRequest(parseInt(id), req.user.id);
+  }
+
+  @Post(':id/block')
   @ApiOperation({ summary: 'Block user' })
-  @ApiResponse({ status: 201, description: 'User blocked successfully', type: FriendshipDto })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async blockUser(@Body() dto: BlockUserDto, @Request() req) {
-    return this.friendsService.blockUser(req.user.id, dto);
+  @ApiResponse({ status: 200, description: 'User blocked successfully' })
+  async blockUser(@Param('id') id: string, @Request() req) {
+    return this.friendsService.blockUser(req.user.id, parseInt(id));
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Remove friend' })
   @ApiResponse({ status: 200, description: 'Friend removed successfully' })
-  @ApiResponse({ status: 404, description: 'Friendship not found' })
   async removeFriend(@Param('id') id: string, @Request() req) {
-    await this.friendsService.removeFriend(req.user.id, +id);
-    return { message: 'Friend removed successfully' };
+    return this.friendsService.removeFriend(req.user.id, parseInt(id));
   }
 }

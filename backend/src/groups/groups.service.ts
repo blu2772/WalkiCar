@@ -1,11 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
-import { Group } from './entities/group.entity';
-import { GroupMember } from './entities/group-member.entity';
+import { Group } from '../users/entities/group.entity';
+import { GroupMember, GroupRole } from '../users/entities/group-member.entity';
 import { User } from '../users/entities/user.entity';
-import { CreateGroupDto, UpdateGroupDto, JoinGroupDto } from './dto/group.dto';
+import { CreateGroupDto, UpdateGroupDto, JoinGroupDto } from './dto/groups.dto';
 
 @Injectable()
 export class GroupsService {
@@ -18,50 +17,61 @@ export class GroupsService {
     private userRepository: Repository<User>,
   ) {}
 
-  async create(userId: number, dto: CreateGroupDto): Promise<Group> {
+  async createGroup(createGroupDto: CreateGroupDto, ownerId: number): Promise<Group> {
     const group = this.groupRepository.create({
-      owner_id: userId,
-      name: dto.name,
-      description: dto.description,
-      is_public: dto.is_public || false,
+      ...createGroupDto,
+      owner_id: ownerId,
     });
 
     const savedGroup = await this.groupRepository.save(group);
 
     // Add owner as member
-    await this.groupMemberRepository.save({
+    const ownerMember = this.groupMemberRepository.create({
       group_id: savedGroup.id,
-      user_id: userId,
-      role: 'owner',
+      user_id: ownerId,
+      role: GroupRole.OWNER,
     });
+    await this.groupMemberRepository.save(ownerMember);
 
     return savedGroup;
   }
 
-  async findAll(userId: number): Promise<Group[]> {
-    // Get groups where user is member or public groups
-    return this.groupRepository
+  async getGroups(userId: number): Promise<Group[]> {
+    // Get groups where user is a member
+    const userGroups = await this.groupRepository
       .createQueryBuilder('group')
-      .leftJoin('group.groupMembers', 'member', 'member.user_id = :userId', { userId })
-      .where('group.is_public = true OR member.user_id = :userId', { userId })
-      .leftJoinAndSelect('group.owner', 'owner')
-      .leftJoinAndSelect('group.groupMembers', 'groupMembers')
-      .leftJoinAndSelect('groupMembers.user', 'memberUser')
+      .leftJoin('group.members', 'member')
+      .where('member.user_id = :userId', { userId })
       .getMany();
+
+    // Get public groups
+    const publicGroups = await this.groupRepository.find({
+      where: { is_public: true },
+    });
+
+    // Combine and deduplicate
+    const allGroups = [...userGroups];
+    publicGroups.forEach(publicGroup => {
+      if (!allGroups.find(g => g.id === publicGroup.id)) {
+        allGroups.push(publicGroup);
+      }
+    });
+
+    return allGroups;
   }
 
-  async findOne(id: number, userId: number): Promise<Group> {
+  async getGroupById(groupId: number, userId: number): Promise<Group> {
     const group = await this.groupRepository.findOne({
-      where: { id },
-      relations: ['owner', 'groupMembers', 'groupMembers.user'],
+      where: { id: groupId },
+      relations: ['members', 'members.user'],
     });
 
     if (!group) {
       throw new NotFoundException('Group not found');
     }
 
-    // Check if user can access this group
-    const isMember = group.groupMembers.some(member => member.user_id === userId);
+    // Check if user has access to the group
+    const isMember = group.members.some(member => member.user_id === userId);
     if (!group.is_public && !isMember) {
       throw new ForbiddenException('Access denied to private group');
     }
@@ -69,58 +79,34 @@ export class GroupsService {
     return group;
   }
 
-  async update(id: number, dto: UpdateGroupDto, userId: number): Promise<Group> {
-    const group = await this.findOne(id, userId);
-    
-    // Check if user is owner or mod
-    const member = group.groupMembers.find(m => m.user_id === userId);
-    if (!member || !['owner', 'mod'].includes(member.role)) {
-      throw new ForbiddenException('Only owners and moderators can update group');
-    }
+  async joinGroup(groupId: number, userId: number): Promise<GroupMember> {
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
 
-    Object.assign(group, dto);
-    return this.groupRepository.save(group);
-  }
-
-  async remove(id: number, userId: number): Promise<void> {
-    const group = await this.findOne(id, userId);
-    
-    // Only owner can delete group
-    const member = group.groupMembers.find(m => m.user_id === userId);
-    if (!member || member.role !== 'owner') {
-      throw new ForbiddenException('Only group owner can delete group');
-    }
-
-    await this.groupRepository.remove(group);
-  }
-
-  async joinGroup(userId: number, dto: JoinGroupDto): Promise<GroupMember> {
-    const group = await this.groupRepository.findOne({ where: { id: dto.groupId } });
-    
     if (!group) {
       throw new NotFoundException('Group not found');
     }
 
     // Check if user is already a member
     const existingMember = await this.groupMemberRepository.findOne({
-      where: { group_id: dto.groupId, user_id: userId },
+      where: { group_id: groupId, user_id: userId },
     });
 
     if (existingMember) {
-      throw new BadRequestException('User is already a member of this group');
+      throw new ForbiddenException('User is already a member of this group');
     }
 
-    // Add user as member
     const member = this.groupMemberRepository.create({
-      group_id: dto.groupId,
+      group_id: groupId,
       user_id: userId,
-      role: 'member',
+      role: GroupRole.MEMBER,
     });
 
     return this.groupMemberRepository.save(member);
   }
 
-  async leaveGroup(userId: number, groupId: number): Promise<void> {
+  async leaveGroup(groupId: number, userId: number): Promise<void> {
     const member = await this.groupMemberRepository.findOne({
       where: { group_id: groupId, user_id: userId },
     });
@@ -129,19 +115,56 @@ export class GroupsService {
       throw new NotFoundException('User is not a member of this group');
     }
 
-    // Owner cannot leave group (must delete it instead)
-    if (member.role === 'owner') {
-      throw new BadRequestException('Group owner cannot leave group. Delete the group instead.');
+    // Check if user is the owner
+    if (member.role === GroupRole.OWNER) {
+      throw new ForbiddenException('Group owner cannot leave the group');
     }
 
     await this.groupMemberRepository.remove(member);
   }
 
-  async getUserRole(userId: number, groupId: number): Promise<'owner' | 'mod' | 'member' | null> {
-    const member = await this.groupMemberRepository.findOne({
-      where: { group_id: groupId, user_id: userId },
+  async updateGroup(groupId: number, updateGroupDto: UpdateGroupDto, userId: number): Promise<Group> {
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['members'],
     });
 
-    return member ? member.role : null;
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    // Check if user is the owner
+    const isOwner = group.members.some(member => 
+      member.user_id === userId && member.role === GroupRole.OWNER
+    );
+
+    if (!isOwner) {
+      throw new ForbiddenException('Only group owner can update the group');
+    }
+
+    Object.assign(group, updateGroupDto);
+    return this.groupRepository.save(group);
+  }
+
+  async deleteGroup(groupId: number, userId: number): Promise<void> {
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['members'],
+    });
+
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    // Check if user is the owner
+    const isOwner = group.members.some(member => 
+      member.user_id === userId && member.role === GroupRole.OWNER
+    );
+
+    if (!isOwner) {
+      throw new ForbiddenException('Only group owner can delete the group');
+    }
+
+    await this.groupRepository.remove(group);
   }
 }

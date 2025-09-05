@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: walkicar-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-walkicar}
+      MYSQL_USER: ${MYSQL_USERNAME:-walkicar}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-walkicar_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/mysql:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - walkicar-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: walkicar-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - walkicar-network
+
+  # coturn TURN/STUN Server
+  turn:
+    image: coturn/coturn:latest
+    container_name: walkicar-turn
+    restart: unless-stopped
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "49152-65535:49152-65535/udp"
+    environment:
+      TURN_USERNAME: ${TURN_USERNAME:-turnuser}
+      TURN_PASSWORD: ${TURN_PASSWORD:-turnpassword}
+      TURN_REALM: ${TURN_REALM:-walkicar}
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf
+    networks:
+      - walkicar-network
+
+  # WalkiCar Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: walkicar-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-walkicar}
+      MYSQL_USERNAME: ${MYSQL_USERNAME:-walkicar}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-walkicar_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID}
+      APPLE_KEY_ID: ${APPLE_KEY_ID}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID}
+      TURN_URI: ${TURN_URI:-turn:turn:3478}
+      TURN_USERNAME: ${TURN_USERNAME:-turnuser}
+      TURN_PASSWORD: ${TURN_PASSWORD:-turnpassword}
+      TURN_REALM: ${TURN_REALM:-walkicar}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    depends_on:
+      - mysql
+      - redis
+      - turn
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - walkicar-network
+
+  # Nginx Reverse Proxy
+  proxy:
+    image: nginx:alpine
+    container_name: walkicar-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - api
+    networks:
+      - walkicar-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  walkicar-network:
+    driver: bridge

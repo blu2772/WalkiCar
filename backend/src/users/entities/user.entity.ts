@@ -1,7 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { Friendship } from '../../friends/entities/friendship.entity';
-import { GroupMember } from '../../groups/entities/group-member.entity';
-import { Vehicle } from '../../vehicles/entities/vehicle.entity';
+import { Friendship } from './friendship.entity';
+import { Group } from './group.entity';
+import { GroupMember } from './group-member.entity';
+import { Vehicle } from './vehicle.entity';
+import { RefreshToken } from './refresh-token.entity';
 
 @Entity('users')
 export class User {
@@ -23,12 +25,22 @@ export class User {
   @UpdateDateColumn()
   updated_at: Date;
 
+  // Relations
   @OneToMany(() => Friendship, friendship => friendship.user)
   friendships: Friendship[];
 
-  @OneToMany(() => GroupMember, groupMember => groupMember.user)
+  @OneToMany(() => Friendship, friendship => friendship.friend)
+  friendOf: Friendship[];
+
+  @OneToMany(() => Group, group => group.owner)
+  ownedGroups: Group[];
+
+  @OneToMany(() => GroupMember, member => member.user)
   groupMemberships: GroupMember[];
 
   @OneToMany(() => Vehicle, vehicle => vehicle.user)
   vehicles: Vehicle[];
+
+  @OneToMany(() => RefreshToken, token => token.user)
+  refreshTokens: RefreshToken[];
 }

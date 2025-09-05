@@ -1,213 +1,304 @@
-# WalkiCar - Vollständige iOS & Backend Lösung
+# 🚗 WalkiCar - Voice-Enabled Car Tracking App
 
-Eine moderne Walkie-Talkie-App für Fahrzeugfahrer mit Voice-Chat, Live-Tracking und Freundesnetzwerk.
+WalkiCar ist eine vollständige iOS-App mit Backend für Fahrzeug-Tracking und Voice-Chat zwischen Freunden. Die App ermöglicht es Benutzern, ihre Fahrzeuge zu verfolgen, mit Freunden zu kommunizieren und Live-Positionen auf einer Karte zu sehen.
 
-## 🚗 Features
+## ✨ Features
 
-### Kernfunktionen
-- **Sign in with Apple** - Sichere Authentifizierung
-- **Freunde-Management** - Suche, Anfragen senden/akzeptieren, Blockieren
-- **Gruppen mit Voice-Chat** - Permanente Voice-Channels mit Push-to-Talk
-- **Car Map** - Live-Fahrzeug-Tracking mit MapKit
-- **Garage** - Fahrzeug-Management mit Sichtbarkeits-Einstellungen
+### 🔐 Authentifizierung
+- **Sign in with Apple** Integration
+- JWT-basierte Authentifizierung mit Refresh-Tokens
+- Sichere Benutzerverwaltung
 
-### Audio-System (Musik-Priorität)
-- **Spotify bleibt in A2DP-Qualität** während Voice-Chat
-- **Voice-Audio über iPhone-Speaker** (konfigurierbar)
-- **Push-to-Talk** mit visueller Rückmeldung
-- **Zwei Modi**: Musik-Priorität (Standard) und Freisprech-Priorität
+### 👥 Freunde-System
+- Benutzer suchen und Freundschaftsanfragen senden
+- Freundschaftsanfragen akzeptieren/ablehnen
+- Benutzer blockieren und Freunde entfernen
+- Freundesliste verwalten
+
+### 🎙️ Voice-Chat
+- **Push-to-Talk** Funktionalität
+- **WebRTC** für Audio-Übertragung
+- Gruppenbasierte Voice-Chats
+- **Musik-Priorität**: Spotify läuft in voller Qualität, Voice über iPhone-Lautsprecher
+- Optionaler Hands-Free-Modus (mit Qualitätsabfall-Warnung)
+
+### 🗺️ Car Map & Tracking
+- **Garage**: Fahrzeuge hinzufügen, bearbeiten und verwalten
+- **Live-Tracking**: Positionsupdates in Echtzeit
+- **Sichtbarkeit**: Private, Freunde oder öffentlich
+- **Tracking-Modi**: Aus, nur bei Bewegung, immer
+- **Spatial Queries**: MySQL 8 mit räumlichen Indizes für Nearby-Suche
 
 ## 🏗️ Architektur
 
-### Backend (NestJS + TypeScript)
-- **Auth Service**: Sign in with Apple → JWT Tokens
-- **Friends Service**: Freundesnetzwerk-Management
-- **Groups Service**: Gruppen mit permanenten Voice-Channels
-- **Vehicles Service**: Fahrzeug-Tracking mit Spatial Queries
-- **Voice Service**: LiveKit Integration für WebRTC
+### Backend (NestJS/TypeScript)
+- **REST API** mit Swagger-Dokumentation
+- **WebSocket Gateway** für WebRTC Signaling
+- **MySQL 8** mit Spatial-Support
+- **Redis** für Caching und Rate-Limiting
+- **coturn** TURN/STUN Server für WebRTC
 
-### iOS (SwiftUI + iOS 16+)
-- **AudioRoutingManager**: Musik-Priorität während Voice-Chat
-- **MapKit Integration**: Live-Fahrzeug-Tracking mit Clustering
-- **LiveKit WebRTC**: Push-to-Talk Voice-Chat
-- **Combine**: Reaktive Datenarchitektur
+### iOS App (SwiftUI)
+- **iOS 16+** Unterstützung
+- **SwiftUI** mit Combine für State Management
+- **AudioRoutingManager** für Musik-Priorität
+- **MapKit** für Kartenansicht
+- **WebRTC** für Voice-Chat
 
-### Infrastructure
-- **MySQL 8**: Mit Spatial Index für Geo-Queries
-- **Redis**: Rate Limiting und Caching
-- **LiveKit Server**: SFU für WebRTC
-- **coturn**: STUN/TURN Server
-- **Docker Compose**: Vollständige Entwicklungsumgebung
+## 🚀 Quick Start
 
-## 🚀 Setup
+### Voraussetzungen
+- **Docker** und **Docker Compose**
+- **Xcode 14+** für iOS-Entwicklung
+- **Node.js 18+** für Backend-Entwicklung
 
 ### 1. Backend starten
+
 ```bash
-cd backend
-cp env.example .env
-# Bearbeite .env mit deinen Werten
+# Repository klonen
+git clone <repository-url>
+cd WalkiCar
+
+# Environment konfigurieren
+cp backend/env.example backend/.env
+# Bearbeiten Sie die .env-Datei mit Ihren Apple Developer Credentials
+
+# Services starten
 docker-compose up -d
+
+# Datenbank-Schema importieren
+mysql -h localhost -u walkicar -p walkicar < db/mysql/00_all.sql
 ```
 
-### 2. MySQL Schema importieren
+### 2. iOS App konfigurieren
+
 ```bash
-mysql -u root -p walkicar < db/mysql/00_all.sql
+# iOS-Projekt öffnen
+open "IOS App/WalkiCar/WalkiCar.xcodeproj"
+
+# In Xcode:
+# 1. Bundle Identifier setzen
+# 2. Apple Developer Team auswählen
+# 3. Sign in with Apple Capability aktivieren
+# 4. Backend-URL in APIService anpassen
 ```
 
-### 3. iOS App öffnen
-```bash
-cd "IOS App/WalkiCar"
-open WalkiCar.xcodeproj
-```
+### 3. Services überprüfen
 
-### 4. Dependencies installieren
-- LiveKit SDK wird automatisch über Swift Package Manager geladen
-- Backend Dependencies werden über npm installiert
+- **Backend API**: http://localhost:3000
+- **API Dokumentation**: http://localhost:3000/api/docs
+- **Health Check**: http://localhost:3000/health
+- **MySQL**: localhost:3306
+- **Redis**: localhost:6379
+- **TURN Server**: localhost:3478
 
 ## 📱 iOS App Features
 
-### Welcome Screen
-- Sign in with Apple Integration
-- Automatische Token-Verwaltung
-- JWT-basierte Authentifizierung
+### Audio-Routing-Manager
 
-### Map View
-- **Live-Fahrzeug-Tracking** mit MapKit
-- **Filter**: Nur Freunde, Nur bewegte Fahrzeuge
-- **Spatial Queries**: 5km Radius-Suche
-- **Annotation Clustering** für Performance
+Der `AudioRoutingManager` implementiert zwei Modi:
 
-### Groups & Voice Chat
-- **Gruppen erstellen/beitreten**
-- **Permanente Voice-Channels** pro Gruppe
-- **Push-to-Talk** mit Hold-to-Talk Button
-- **LiveKit WebRTC** für niedrige Latenz
+#### 🎵 Musik-Priorität (Standard)
+- **Spotify** läuft in voller A2DP-Qualität
+- **Voice-Chat** über iPhone-Lautsprecher
+- **Kein HFP** (Hands-Free Profile) um Musik-Qualität zu erhalten
+- **`.mixWithOthers`** Option aktiviert
 
-### Garage
-- **Fahrzeuge hinzufügen/verwalten**
-- **Sichtbarkeit**: Private, Freunde, Öffentlich
-- **Tracking-Modi**: Aus, Nur bei Bewegung, Immer
-- **BLE-Identifier** für Hardware-Integration
+#### 📞 Hands-Free-Priorität (Optional)
+- Erlaubt **HFP** für Auto-Freisprechanlagen
+- **Qualitätsabfall** bei Musik wird dokumentiert
+- Umschaltbar in den Einstellungen
 
-### Settings
-- **Audio-Modi umschalten**
-- **Privacy-Einstellungen**
-- **Freunde-Management**
-- **Benachrichtigungen**
+### Push-to-Talk Implementation
 
-## 🔊 Audio-Routing System
-
-### Musik-Priorität (Standard)
 ```swift
-// AudioSession konfigurieren
-try audioSession.setCategory(
-  .playAndRecord,
-  mode: .voiceChat,
-  options: [.mixWithOthers, .defaultToSpeaker]
-)
-// WICHTIG: Keine .allowBluetooth Option!
+// PTT Button mit Long Press Gesture
+.onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+  isPressingPTT = pressing
+  if pressing {
+    audioRoutingManager.startVoiceSession()
+    // WebRTC: localTrack.unmute()
+  } else {
+    audioRoutingManager.endVoiceSession()
+    // WebRTC: localTrack.mute()
+  }
+}, perform: {})
 ```
 
-**Verhalten:**
-- Spotify bleibt in **A2DP-Qualität**
-- Voice-Audio über **iPhone-Speaker**
-- Kein HFP-Telefonmodus
-- Musik wird nicht unterbrochen
+## 🔧 Backend API
 
-### Freisprech-Priorität (Optional)
-```swift
-// HFP-Modus aktivieren
-try audioSession.setCategory(
-  .playAndRecord,
-  mode: .voiceChat,
-  options: [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP]
-)
+### Authentifizierung
+```bash
+# Sign in with Apple
+POST /api/v1/auth/apple
+{
+  "identityToken": "apple_identity_token",
+  "displayName": "User Name",
+  "avatarUrl": "https://example.com/avatar.jpg"
+}
+
+# Token refresh
+POST /api/v1/auth/refresh
+{
+  "refreshToken": "jwt_refresh_token"
+}
 ```
 
-**Verhalten:**
-- HFP-Modus aktiviert
-- Qualitätsabfall bei Musik (bekannt/akzeptiert)
-- Voice über Auto-Freisprechanlage
+### Freunde
+```bash
+# Benutzer suchen
+GET /api/v1/friends/search?query=john
 
-## 🗄️ Datenbank Schema
+# Freundschaftsanfrage senden
+POST /api/v1/friends/requests
+{
+  "userId": 123
+}
 
-### Tabellen
-- `users` - Benutzer mit Apple Sub
-- `friendships` - Freundesbeziehungen mit Status
-- `groups` - Gruppen mit Owner/Mod/Member Rollen
-- `group_members` - Gruppenmitgliedschaften
-- `vehicles` - Fahrzeuge mit Sichtbarkeit/Tracking
-- `vehicle_positions` - Positionsdaten mit Spatial Index
-- `refresh_tokens` - JWT Refresh Token Management
+# Anfrage akzeptieren
+PATCH /api/v1/friends/requests/456/accept
+```
 
-### Spatial Queries
+### Gruppen & Voice-Chat
+```bash
+# Gruppe erstellen
+POST /api/v1/groups
+{
+  "name": "Car Enthusiasts",
+  "description": "Group for car lovers",
+  "is_public": true
+}
+
+# Gruppe beitreten
+POST /api/v1/groups/123/join
+
+# WebSocket für Voice-Chat
+WS /voice
+```
+
+### Fahrzeuge & Tracking
+```bash
+# Fahrzeug hinzufügen
+POST /api/v1/vehicles
+{
+  "name": "My Tesla",
+  "brand": "Tesla",
+  "model": "Model S",
+  "color": "Blue",
+  "visibility": "friends",
+  "track_mode": "moving_only"
+}
+
+# Position senden
+POST /api/v1/vehicles/123/positions
+{
+  "lat": 40.7128,
+  "lon": -74.0060,
+  "speed": 45.5,
+  "heading": 180.0,
+  "moving": true
+}
+
+# Nearby Fahrzeuge
+GET /api/v1/map/nearby?centerLat=40.7128&centerLon=-74.0060&radius=5000
+```
+
+## 🗄️ Datenbank-Schema
+
+### MySQL 8 mit Spatial Support
+
 ```sql
--- Fahrzeuge in 5km Radius finden
-SELECT v.*, ST_Distance_Sphere(
-  ST_PointFromText(CONCAT('POINT(', vp.lon, ' ', vp.lat, ')'), 4326),
-  ST_PointFromText(CONCAT('POINT(', ?, ' ', ?, ')'), 4326)
-) AS distance_meters
+-- Räumliche Indizes für Nearby-Suche
+CREATE TABLE vehicle_positions (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  vehicle_id INT NOT NULL,
+  lat DOUBLE NOT NULL,
+  lon DOUBLE NOT NULL,
+  speed DOUBLE NULL,
+  heading DOUBLE NULL,
+  moving BOOLEAN DEFAULT FALSE,
+  ts TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
+  location POINT SRID 4326 AS (ST_PointFromText(CONCAT('POINT(', lon, ' ', lat, ')'), 4326)) STORED,
+  
+  FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
+  INDEX idx_vehicle_ts (vehicle_id, ts DESC),
+  INDEX idx_moving (moving),
+  SPATIAL INDEX sp_location (location)
+);
+```
+
+### Beispiel-Queries
+
+```sql
+-- Nearby Fahrzeuge (5km Radius)
+SELECT v.*, vp.lat, vp.lon, vp.speed, vp.moving
 FROM vehicles v
 JOIN vehicle_positions vp ON v.id = vp.vehicle_id
-WHERE ST_Distance_Sphere(...) <= ?
+WHERE ST_Distance_Sphere(
+  ST_PointFromText(CONCAT('POINT(', vp.lon, ' ', vp.lat, ')'), 4326),
+  ST_PointFromText('POINT(-74.0060 40.7128)', 4326)
+) <= 5000
+AND v.track_mode != 'off'
+ORDER BY vp.ts DESC;
+
+-- Nur bewegte Fahrzeuge
+SELECT * FROM vehicle_positions 
+WHERE moving = TRUE 
+AND ts > DATE_SUB(NOW(), INTERVAL 5 MINUTE);
 ```
 
-## 🔧 API Endpoints
+## 🌐 WebRTC Signaling
 
-### Auth
-- `POST /auth/apple` - Sign in with Apple
-- `POST /auth/refresh` - Token Refresh
-- `GET /auth/me` - Current User
+### Signaling-Server (WebSocket)
 
-### Friends
-- `GET /friends` - Freundesliste
-- `POST /friends/requests` - Freundschaftsanfrage senden
-- `POST /friends/requests/:id/respond` - Anfrage beantworten
-- `DELETE /friends/:id` - Freund entfernen
+```typescript
+// Client verbindet sich
+WS /voice
+Authorization: Bearer <jwt_token>
 
-### Groups & Voice
-- `POST /groups` - Gruppe erstellen
-- `GET /groups` - Gruppen auflisten
-- `POST /groups/:id/join` - Gruppe beitreten
-- `GET /voice/groups/:id/token` - LiveKit Join Token
+// Raum beitreten
+{
+  "type": "join-room",
+  "data": { "groupId": "123" }
+}
 
-### Vehicles & Map
-- `POST /vehicles` - Fahrzeug hinzufügen
-- `GET /vehicles/mine` - Eigene Fahrzeuge
-- `POST /vehicles/:id/positions` - Position senden
-- `GET /vehicles/map/nearby` - Nahe Fahrzeuge
+// WebRTC Signaling
+{
+  "type": "offer",
+  "data": { "sdp": "..." },
+  "targetUserId": "456"
+}
 
-## 🐳 Docker Services
+// Push-to-Talk
+{
+  "type": "unmute",
+  "data": { "groupId": "123" }
+}
+```
 
-### Backend Stack
-- **api**: NestJS Backend (Port 3000)
-- **mysql**: MySQL 8 mit Spatial Support (Port 3306)
-- **redis**: Redis für Caching (Port 6379)
-- **livekit**: WebRTC SFU Server (Port 7880)
-- **turn**: coturn STUN/TURN Server (Port 3478)
+### TURN-Server Konfiguration
 
-### Environment Variables
 ```bash
-# Database
-MYSQL_HOST=localhost
-MYSQL_DB=walkicar
-MYSQL_USER=walkicar
-MYSQL_PASSWORD=walkicar123
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRES_IN=15m
-
-# Apple Sign In
-APPLE_TEAM_ID=your-apple-team-id
-APPLE_KEY_ID=your-apple-key-id
-APPLE_PRIVATE_KEY=your-apple-private-key
-
-# LiveKit
-LIVEKIT_API_KEY=devkey
-LIVEKIT_API_SECRET=secret
-LIVEKIT_WS_URL=ws://localhost:7880
+# coturn Konfiguration
+listening-port=3478
+user=turnuser:turnpassword
+realm=walkicar
+relay-range=49152-65535
 ```
+
+## 🔒 Sicherheit & Privacy
+
+### Datenschutz-Features
+- **Feingranulare Sichtbarkeit**: Private, Freunde, Öffentlich
+- **Tracking-Modi**: Aus, nur bei Bewegung, immer
+- **Freundschafts-basierte Filter**: Nur Freunde sehen private Fahrzeuge
+- **Rate-Limiting**: 60 Requests/Minute für Positionsupdates
+
+### Authentifizierung
+- **Apple Sign In** für sichere Authentifizierung
+- **JWT Tokens** mit kurzer Lebensdauer (15 Min)
+- **Refresh Tokens** für verlängerte Sessions
+- **WebSocket Authentication** für Voice-Chat
 
 ## 🧪 Testing
 
@@ -216,62 +307,75 @@ LIVEKIT_WS_URL=ws://localhost:7880
 cd backend
 npm test
 npm run test:e2e
+npm run test:cov
 ```
 
 ### iOS Tests
 ```bash
 # In Xcode: Cmd+U für Unit Tests
-# UI Tests für kritische Flows
+# UI Tests für Voice-Chat und Map-Funktionalität
 ```
 
-## 📚 Dokumentation
+## 📊 Monitoring & Logging
 
-- **API Docs**: http://localhost:3000/api/docs (Swagger)
-- **Spatial Queries**: `db/mysql/08_spatial_queries.sql`
-- **Audio Routing**: `AudioRoutingManager.swift`
+### Health Checks
+- **API Health**: `GET /health`
+- **Database**: Connection Pool Status
+- **Redis**: Cache Hit Rate
+- **TURN Server**: Active Connections
 
-## 🔒 Sicherheit
-
-- **JWT Tokens** mit kurzer Lebensdauer (15min)
-- **Refresh Tokens** für sichere Erneuerung
-- **Rate Limiting** für Positionsupdates (60 req/min)
-- **Privacy Filter** serverseitig
-- **Apple Sign In** für sichere Authentifizierung
+### Logging
+- **Structured Logging** ohne PII
+- **Request IDs** für Tracing
+- **WebRTC Signaling** Events
+- **Rate Limiting** Alerts
 
 ## 🚀 Deployment
 
-### Produktionsumgebung
-1. **Environment Variables** konfigurieren
-2. **MySQL Schema** importieren
-3. **Docker Compose** für Produktion anpassen
-4. **TLS/SSL** für API und LiveKit
-5. **Firewall** für STUN/TURN Ports öffnen
+### Produktions-Umgebung
 
-### iOS App Store
-1. **Apple Developer Account** konfigurieren
-2. **Sign in with Apple** Capability aktivieren
-3. **Location Services** Berechtigung hinzufügen
-4. **Microphone** Berechtigung für Voice-Chat
+```bash
+# Environment Variables
+NODE_ENV=production
+MYSQL_HOST=your-mysql-host
+REDIS_HOST=your-redis-host
+JWT_SECRET=your-production-secret
+APPLE_TEAM_ID=your-apple-team-id
+APPLE_KEY_ID=your-apple-key-id
+APPLE_PRIVATE_KEY=your-apple-private-key
+
+# SSL/TLS Konfiguration
+# Nginx Reverse Proxy mit Let's Encrypt
+# TURN Server mit SSL-Zertifikaten
+```
+
+### Docker Compose Production
+```yaml
+# Produktions-optimierte Konfiguration
+# SSL-Zertifikate
+# Load Balancing
+# Monitoring Stack (Prometheus/Grafana)
+```
 
 ## 🤝 Contributing
 
 1. Fork das Repository
 2. Feature Branch erstellen (`git checkout -b feature/amazing-feature`)
-3. Commits mit klaren Messages (`git commit -m 'Add amazing feature'`)
-4. Branch pushen (`git push origin feature/amazing-feature`)
+3. Commits mit aussagekräftigen Messages
+4. Tests schreiben und ausführen
 5. Pull Request erstellen
 
 ## 📄 Lizenz
 
-MIT License - siehe [LICENSE](LICENSE) für Details.
+MIT License - siehe [LICENSE](LICENSE) Datei für Details.
 
 ## 🆘 Support
 
-Bei Fragen oder Problemen:
-- **Issues**: GitHub Issues erstellen
-- **Discussions**: GitHub Discussions nutzen
-- **Email**: support@walkicar.app
+Bei Problemen oder Fragen:
+- **Issues**: GitHub Issues verwenden
+- **Dokumentation**: `/docs` Ordner
+- **API Docs**: http://localhost:3000/api/docs
 
 ---
 
-**WalkiCar** - Verbinde dich mit Freunden, teile deine Fahrt und genieße Musik in voller Qualität! 🎵🚗
+**WalkiCar** - Verbinde dich mit deinen Freunden, während du fährst! 🚗💨

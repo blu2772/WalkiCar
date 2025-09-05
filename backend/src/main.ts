@@ -8,21 +8,21 @@ async function bootstrap() {
 
   // Global validation pipe
   app.useGlobalPipes(new ValidationPipe({
-    transform: true,
     whitelist: true,
     forbidNonWhitelisted: true,
+    transform: true,
   }));
 
   // CORS configuration
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:8080'],
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     credentials: true,
   });
 
   // Swagger documentation
   const config = new DocumentBuilder()
     .setTitle('WalkiCar API')
-    .setDescription('WalkiCar Backend API Documentation')
+    .setDescription('WalkiCar Backend API with WebRTC Signaling')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -32,7 +32,9 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`WalkiCar API running on port ${port}`);
+  
+  console.log(`🚗 WalkiCar Backend running on port ${port}`);
+  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

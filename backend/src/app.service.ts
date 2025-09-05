@@ -3,15 +3,15 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'WalkiCar API is running!';
+    return '🚗 WalkiCar Backend API is running!';
   }
 
   getHealth() {
     return {
-      status: 'ok',
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
+      service: 'walkicar-backend',
+      version: '1.0.0',
     };
   }
 }

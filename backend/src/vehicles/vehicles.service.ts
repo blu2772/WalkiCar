@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
-import { Vehicle } from './entities/vehicle.entity';
-import { VehiclePosition } from './entities/vehicle-position.entity';
-import { CreateVehicleDto, UpdateVehicleDto, VehiclePositionDto, NearbyVehiclesDto } from './dto/vehicle.dto';
+import { Vehicle, VehicleVisibility, TrackMode } from '../users/entities/vehicle.entity';
+import { VehiclePosition } from '../users/entities/vehicle-position.entity';
+import { User } from '../users/entities/user.entity';
+import { CreateVehicleDto, UpdateVehicleDto, CreatePositionDto, NearbyVehiclesDto } from './dto/vehicles.dto';
 
 @Injectable()
 export class VehiclesService {
@@ -13,122 +13,120 @@ export class VehiclesService {
     private vehicleRepository: Repository<Vehicle>,
     @InjectRepository(VehiclePosition)
     private positionRepository: Repository<VehiclePosition>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
-  async create(userId: number, dto: CreateVehicleDto): Promise<Vehicle> {
+  async createVehicle(createVehicleDto: CreateVehicleDto, userId: number): Promise<Vehicle> {
     const vehicle = this.vehicleRepository.create({
+      ...createVehicleDto,
       user_id: userId,
-      name: dto.name,
-      brand: dto.brand,
-      model: dto.model,
-      color: dto.color,
-      ble_identifier: dto.ble_identifier,
-      visibility: dto.visibility || 'private',
-      track_mode: dto.track_mode || 'off',
     });
 
     return this.vehicleRepository.save(vehicle);
   }
 
-  async findAll(userId: number): Promise<Vehicle[]> {
+  async getUserVehicles(userId: number): Promise<Vehicle[]> {
     return this.vehicleRepository.find({
       where: { user_id: userId },
-      relations: ['user'],
       order: { created_at: 'DESC' },
     });
   }
 
-  async findOne(id: number, userId: number): Promise<Vehicle> {
+  async getVehicleById(vehicleId: number, userId: number): Promise<Vehicle> {
     const vehicle = await this.vehicleRepository.findOne({
-      where: { id },
-      relations: ['user', 'positions'],
+      where: { id: vehicleId, user_id: userId },
     });
 
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
     }
 
-    if (vehicle.user_id !== userId) {
-      throw new ForbiddenException('Access denied to vehicle');
-    }
-
     return vehicle;
   }
 
-  async update(id: number, dto: UpdateVehicleDto, userId: number): Promise<Vehicle> {
-    const vehicle = await this.findOne(id, userId);
-    Object.assign(vehicle, dto);
+  async updateVehicle(vehicleId: number, updateVehicleDto: UpdateVehicleDto, userId: number): Promise<Vehicle> {
+    const vehicle = await this.getVehicleById(vehicleId, userId);
+    
+    Object.assign(vehicle, updateVehicleDto);
     return this.vehicleRepository.save(vehicle);
   }
 
-  async remove(id: number, userId: number): Promise<void> {
-    const vehicle = await this.findOne(id, userId);
+  async deleteVehicle(vehicleId: number, userId: number): Promise<void> {
+    const vehicle = await this.getVehicleById(vehicleId, userId);
     await this.vehicleRepository.remove(vehicle);
   }
 
-  async addPosition(vehicleId: number, dto: VehiclePositionDto, userId: number): Promise<VehiclePosition> {
-    const vehicle = await this.findOne(vehicleId, userId);
-
-    if (vehicle.track_mode === 'off') {
-      throw new BadRequestException('Vehicle tracking is disabled');
-    }
+  async addPosition(vehicleId: number, createPositionDto: CreatePositionDto, userId: number): Promise<VehiclePosition> {
+    // Verify vehicle ownership
+    await this.getVehicleById(vehicleId, userId);
 
     const position = this.positionRepository.create({
+      ...createPositionDto,
       vehicle_id: vehicleId,
-      lat: dto.lat,
-      lon: dto.lon,
-      speed: dto.speed,
-      heading: dto.heading,
-      moving: dto.moving || false,
     });
 
     return this.positionRepository.save(position);
   }
 
-  async getNearbyVehicles(userId: number, dto: NearbyVehiclesDto): Promise<Vehicle[]> {
-    const { center_lat, center_lon, radius = 5000, visibility = 'all', moving_only = false } = dto;
+  async getNearbyVehicles(nearbyVehiclesDto: NearbyVehiclesDto, userId: number): Promise<Vehicle[]> {
+    const { centerLat, centerLon, radius = 5000 } = nearbyVehiclesDto;
 
-    let query = this.vehicleRepository
-      .createQueryBuilder('vehicle')
-      .leftJoinAndSelect('vehicle.user', 'user')
-      .leftJoinAndSelect('vehicle.positions', 'position')
-      .where('vehicle.track_mode != :trackMode', { trackMode: 'off' })
-      .andWhere('position.ts >= :recentTime', { recentTime: new Date(Date.now() - 5 * 60 * 1000) }) // Last 5 minutes
-      .andWhere(
-        'ST_Distance_Sphere(ST_PointFromText(CONCAT("POINT(", position.lon, " ", position.lat, ")"), 4326), ST_PointFromText(CONCAT("POINT(", :lon, " ", :lat, ")"), 4326)) <= :radius',
-        { lat: center_lat, lon: center_lon, radius }
-      );
-
-    // Apply visibility filter
-    if (visibility === 'friends') {
-      // This would need a join with friendships table in a real implementation
-      query = query.andWhere('vehicle.visibility IN (:...visibilities)', { visibilities: ['friends', 'public'] });
-    } else if (visibility === 'public') {
-      query = query.andWhere('vehicle.visibility = :visibility', { visibility: 'public' });
-    } else {
-      query = query.andWhere('vehicle.visibility IN (:...visibilities)', { visibilities: ['friends', 'public'] });
-    }
-
-    // Apply moving filter
-    if (moving_only) {
-      query = query.andWhere('position.moving = :moving', { moving: true });
-    }
-
-    return query
-      .orderBy('position.ts', 'DESC')
-      .getMany();
-  }
-
-  async getLatestPosition(vehicleId: number): Promise<VehiclePosition | null> {
-    return this.positionRepository.findOne({
-      where: { vehicle_id: vehicleId },
-      order: { ts: 'DESC' },
+    // Get user's friends for privacy filtering
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['friendships'],
     });
+
+    const friendIds = user.friendships
+      .filter(f => f.status === 'accepted')
+      .map(f => f.user_id === userId ? f.friend_id : f.user_id);
+
+    // Query vehicles within radius with privacy filtering
+    const query = this.vehicleRepository
+      .createQueryBuilder('vehicle')
+      .leftJoin('vehicle.positions', 'position')
+      .where('vehicle.track_mode != :off', { off: TrackMode.OFF })
+      .andWhere('position.lat IS NOT NULL')
+      .andWhere('position.lon IS NOT NULL')
+      .andWhere(
+        `ST_Distance_Sphere(
+          ST_PointFromText(CONCAT('POINT(', position.lon, ' ', position.lat, ')'), 4326),
+          ST_PointFromText(CONCAT('POINT(', :lon, ' ', :lat, ')'), 4326)
+        ) <= :radius`,
+        { lat: centerLat, lon: centerLon, radius }
+      )
+      .andWhere(
+        '(vehicle.visibility = :public OR (vehicle.visibility = :friends AND vehicle.user_id IN (:...friendIds)))',
+        { public: VehicleVisibility.PUBLIC, friends: VehicleVisibility.FRIENDS, friendIds }
+      )
+      .orderBy('position.ts', 'DESC');
+
+    return query.getMany();
   }
 
-  async getVehicleHistory(vehicleId: number, userId: number, limit: number = 100): Promise<VehiclePosition[]> {
-    const vehicle = await this.findOne(vehicleId, userId);
-    
+  async getVehiclePositions(vehicleId: number, userId: number, limit: number = 100): Promise<VehiclePosition[]> {
+    // Verify vehicle ownership or friendship
+    const vehicle = await this.vehicleRepository.findOne({
+      where: { id: vehicleId },
+      relations: ['user', 'user.friendships'],
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    // Check access permissions
+    const isOwner = vehicle.user_id === userId;
+    const isFriend = vehicle.user.friendships.some(f => 
+      f.status === 'accepted' && (f.user_id === userId || f.friend_id === userId)
+    );
+    const isPublic = vehicle.visibility === VehicleVisibility.PUBLIC;
+
+    if (!isOwner && !isFriend && !isPublic) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
     return this.positionRepository.find({
       where: { vehicle_id: vehicleId },
       order: { ts: 'DESC' },

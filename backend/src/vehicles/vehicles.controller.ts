@@ -1,10 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
-
-import { VehiclesService } from './vehicles.service';
-import { CreateVehicleDto, UpdateVehicleDto, VehiclePositionDto, NearbyVehiclesDto, VehicleDto } from './dto/vehicle.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { VehiclesService } from './vehicles.service';
+import { CreateVehicleDto, UpdateVehicleDto, CreatePositionDto, NearbyVehiclesDto } from './dto/vehicles.dto';
 
 @ApiTags('Vehicles')
 @Controller('vehicles')
@@ -15,67 +13,65 @@ export class VehiclesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new vehicle' })
-  @ApiResponse({ status: 201, description: 'Vehicle created successfully', type: VehicleDto })
-  async create(@Body() dto: CreateVehicleDto, @Request() req) {
-    return this.vehiclesService.create(req.user.id, dto);
+  @ApiResponse({ status: 201, description: 'Vehicle created successfully' })
+  async createVehicle(@Body() createVehicleDto: CreateVehicleDto, @Request() req) {
+    return this.vehiclesService.createVehicle(createVehicleDto, req.user.id);
   }
 
   @Get('mine')
   @ApiOperation({ summary: 'Get user vehicles' })
-  @ApiResponse({ status: 200, description: 'List of user vehicles', type: [VehicleDto] })
-  async findAll(@Request() req) {
-    return this.vehiclesService.findAll(req.user.id);
+  @ApiResponse({ status: 200, description: 'List of user vehicles' })
+  async getUserVehicles(@Request() req) {
+    return this.vehiclesService.getUserVehicles(req.user.id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get vehicle by ID' })
-  @ApiResponse({ status: 200, description: 'Vehicle information', type: VehicleDto })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async findOne(@Param('id') id: string, @Request() req) {
-    return this.vehiclesService.findOne(+id, req.user.id);
+  @ApiResponse({ status: 200, description: 'Vehicle details' })
+  async getVehicleById(@Param('id') id: string, @Request() req) {
+    return this.vehiclesService.getVehicleById(parseInt(id), req.user.id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update vehicle' })
-  @ApiResponse({ status: 200, description: 'Vehicle updated successfully', type: VehicleDto })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async update(@Param('id') id: string, @Body() dto: UpdateVehicleDto, @Request() req) {
-    return this.vehiclesService.update(+id, dto, req.user.id);
+  @ApiResponse({ status: 200, description: 'Vehicle updated successfully' })
+  async updateVehicle(@Param('id') id: string, @Body() updateVehicleDto: UpdateVehicleDto, @Request() req) {
+    return this.vehiclesService.updateVehicle(parseInt(id), updateVehicleDto, req.user.id);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete vehicle' })
   @ApiResponse({ status: 200, description: 'Vehicle deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async remove(@Param('id') id: string, @Request() req) {
-    await this.vehiclesService.remove(+id, req.user.id);
-    return { message: 'Vehicle deleted successfully' };
+  async deleteVehicle(@Param('id') id: string, @Request() req) {
+    return this.vehiclesService.deleteVehicle(parseInt(id), req.user.id);
   }
 
   @Post(':id/positions')
-  @UseGuards(ThrottlerGuard)
   @ApiOperation({ summary: 'Add vehicle position' })
   @ApiResponse({ status: 201, description: 'Position added successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async addPosition(@Param('id') id: string, @Body() dto: VehiclePositionDto, @Request() req) {
-    return this.vehiclesService.addPosition(+id, dto, req.user.id);
+  async addPosition(@Param('id') id: string, @Body() createPositionDto: CreatePositionDto, @Request() req) {
+    return this.vehiclesService.addPosition(parseInt(id), createPositionDto, req.user.id);
   }
 
   @Get(':id/positions')
-  @ApiOperation({ summary: 'Get vehicle position history' })
-  @ApiResponse({ status: 200, description: 'Vehicle position history' })
-  @ApiResponse({ status: 404, description: 'Vehicle not found' })
-  async getHistory(@Param('id') id: string, @Query('limit') limit: string, @Request() req) {
-    return this.vehiclesService.getVehicleHistory(+id, req.user.id, limit ? +limit : 100);
+  @ApiOperation({ summary: 'Get vehicle positions' })
+  @ApiResponse({ status: 200, description: 'List of vehicle positions' })
+  async getVehiclePositions(@Param('id') id: string, @Query('limit') limit: string, @Request() req) {
+    return this.vehiclesService.getVehiclePositions(parseInt(id), req.user.id, parseInt(limit) || 100);
   }
+}
 
-  @Get('map/nearby')
+@ApiTags('Map')
+@Controller('map')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class MapController {
+  constructor(private readonly vehiclesService: VehiclesService) {}
+
+  @Get('nearby')
   @ApiOperation({ summary: 'Get nearby vehicles' })
-  @ApiResponse({ status: 200, description: 'List of nearby vehicles', type: [VehicleDto] })
-  async getNearbyVehicles(@Query() dto: NearbyVehiclesDto, @Request() req) {
-    return this.vehiclesService.getNearbyVehicles(req.user.id, dto);
+  @ApiResponse({ status: 200, description: 'List of nearby vehicles' })
+  async getNearbyVehicles(@Query() nearbyVehiclesDto: NearbyVehiclesDto, @Request() req) {
+    return this.vehiclesService.getNearbyVehicles(nearbyVehiclesDto, req.user.id);
   }
 }
