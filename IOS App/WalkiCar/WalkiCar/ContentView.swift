@@ -33,7 +33,8 @@ class AuthManager: NSObject, ObservableObject {
     let registerRequest = EmailRegisterRequest(
       email: email,
       password: password,
-      displayName: displayName
+      displayName: displayName,
+      avatarUrl: nil
     )
     let response = try await apiService.registerWithEmail(registerRequest)
     
@@ -115,7 +116,7 @@ struct AuthResponse: Codable {
 
 // MARK: - API Service
 class APIService: ObservableObject {
-  let baseURL = "http://localhost:3000/api/v1"
+  let baseURL = "http://timrmp.de:3000/api/v1"
   
   func signInWithApple(_ request: LoginRequest) async throws -> AuthResponse {
     guard let url = URL(string: "\(baseURL)/auth/apple") else {
