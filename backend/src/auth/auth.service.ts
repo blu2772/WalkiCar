@@ -5,9 +5,7 @@ import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { RefreshToken } from '../users/entities/refresh-token.entity';
 import { AppleAuthService } from './apple-auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
+import { LoginDto, RefreshTokenDto, AuthResponseDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {

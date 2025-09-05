@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Vehicle, VehicleVisibility, TrackMode } from '../users/entities/vehicle.entity';
-import { VehiclePosition } from '../users/entities/vehicle-position.entity';
+import { Vehicle, VehicleVisibility, TrackMode } from './entities/vehicle.entity';
+import { VehiclePosition } from './entities/vehicle-position.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateVehicleDto, UpdateVehicleDto, CreatePositionDto, NearbyVehiclesDto } from './dto/vehicles.dto';
 

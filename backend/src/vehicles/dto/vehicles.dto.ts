@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { VehicleVisibility, TrackMode } from '../users/entities/vehicle.entity';
+import { VehicleVisibility, TrackMode } from '../entities/vehicle.entity';
 
 export class CreateVehicleDto {
   @ApiProperty({ description: 'Vehicle name' })
