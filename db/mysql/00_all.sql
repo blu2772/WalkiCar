@@ -96,12 +96,11 @@ CREATE TABLE vehicle_positions (
   heading DOUBLE NULL,
   moving BOOLEAN DEFAULT FALSE,
   ts TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
-  location POINT SRID 4326 AS (ST_PointFromText(CONCAT('POINT(', lon, ' ', lat, ')'), 4326)) STORED,
   
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
   INDEX idx_vehicle_ts (vehicle_id, ts DESC),
   INDEX idx_moving (moving),
-  SPATIAL INDEX sp_location (location)
+  INDEX idx_lat_lon (lat, lon)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Refresh tokens table
