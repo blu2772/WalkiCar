@@ -7,17 +7,17 @@ export class RefreshToken {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  user_id: number;
+  @Column({ name: 'user_id' })
+  userId: number;
 
   @Column({ length: 500, unique: true })
   token: string;
 
-  @Column()
-  expires_at: Date;
+  @Column({ name: 'expires_at' })
+  expiresAt: Date;
 
-  @CreateDateColumn()
-  created_at: Date;
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 
   // Relations
   @ManyToOne(() => User, user => user.refreshTokens)

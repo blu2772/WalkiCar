@@ -8,14 +8,22 @@ USE walkicar;
 -- Users table
 CREATE TABLE users (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  apple_sub VARCHAR(255) UNIQUE NOT NULL,
+  apple_sub VARCHAR(255) UNIQUE NULL,
+  email VARCHAR(255) UNIQUE NULL,
+  password_hash VARCHAR(255) NULL,
   display_name VARCHAR(100) NOT NULL,
   avatar_url VARCHAR(500),
+  email_verified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
   INDEX idx_apple_sub (apple_sub),
-  INDEX idx_display_name (display_name)
+  INDEX idx_email (email),
+  INDEX idx_display_name (display_name),
+  CONSTRAINT chk_auth_method CHECK (
+    (apple_sub IS NOT NULL AND password_hash IS NULL) OR 
+    (email IS NOT NULL AND password_hash IS NOT NULL)
+  )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Friendships table

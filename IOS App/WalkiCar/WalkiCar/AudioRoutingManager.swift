@@ -154,6 +154,9 @@ class AudioRoutingManager: ObservableObject {
       print("🔌 Route configuration changed")
       // Handle configuration change
       
+    case .unknown:
+      print("🔌 Unknown audio route change")
+      
     @unknown default:
       print("🔌 Unknown audio route change")
     }
@@ -183,7 +186,9 @@ class AudioRoutingManager: ObservableObject {
       return "USB Audio"
     case .carAudio:
       return "Car Audio"
-    default:
+    case .none:
+      return "Unknown"
+    @unknown default:
       return "Unknown"
     }
   }
@@ -263,7 +268,9 @@ class AudioQualityMonitor: ObservableObject {
       currentQuality = .medium
     case .builtInSpeaker, .builtInReceiver:
       currentQuality = .high
-    default:
+    case .none:
+      currentQuality = .low
+    @unknown default:
       currentQuality = .low
     }
   }

@@ -33,7 +33,7 @@ export class AuthResponseDto {
   @ApiProperty({ description: 'User information' })
   user: {
     id: number;
-    display_name: string;
-    avatar_url?: string;
+    displayName: string;
+    avatarUrl?: string;
   };
 }

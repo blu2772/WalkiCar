@@ -42,7 +42,7 @@ struct NearbyVehicle: Codable, Identifiable {
 }
 
 // MARK: - Vehicle Service
-class VehicleService: ObservableObject {
+class VehicleService: NSObject, ObservableObject {
   @Published var vehicles: [Vehicle] = []
   @Published var nearbyVehicles: [NearbyVehicle] = []
   @Published var isLoading = false
@@ -51,7 +51,8 @@ class VehicleService: ObservableObject {
   private let locationManager = CLLocationManager()
   @Published var currentLocation: CLLocation?
   
-  init() {
+  override init() {
+    super.init()
     setupLocationManager()
   }
   
@@ -194,10 +195,6 @@ extension VehicleService: CLLocationManagerDelegate {
 // MARK: - Enhanced Map View
 struct MapView: View {
   @StateObject private var vehicleService = VehicleService()
-  @State private var region = MKCoordinateRegion(
-    center: CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060),
-    span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
-  )
   @State private var showingAddVehicle = false
   @State private var selectedVehicle: Vehicle?
   
@@ -208,17 +205,15 @@ struct MapView: View {
         
         VStack(spacing: 0) {
           // Map
-          Map(coordinateRegion: $region, annotationItems: vehicleService.nearbyVehicles) { vehicle in
-            MapAnnotation(coordinate: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lon)) {
-              VehicleAnnotation(vehicle: vehicle)
+          Map {
+            ForEach(vehicleService.nearbyVehicles) { vehicle in
+              Annotation(vehicle.name, coordinate: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lon)) {
+                VehicleAnnotation(vehicle: vehicle)
+              }
             }
           }
+          .mapStyle(.standard)
           .frame(height: 400)
-          .onAppear {
-            if let location = vehicleService.currentLocation {
-              region.center = location.coordinate
-            }
-          }
           
           // Friends Online Section
           VStack(alignment: .leading, spacing: 16) {

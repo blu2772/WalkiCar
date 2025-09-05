@@ -15,7 +15,7 @@ export class UsersService {
   }
 
   async findByAppleSub(appleSub: string): Promise<User> {
-    return this.userRepository.findOne({ where: { apple_sub: appleSub } });
+    return this.userRepository.findOne({ where: { appleSub: appleSub } });
   }
 
   async create(userData: Partial<User>): Promise<User> {

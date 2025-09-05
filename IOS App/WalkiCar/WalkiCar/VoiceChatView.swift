@@ -3,7 +3,7 @@ import Combine
 import WebRTC
 
 // MARK: - WebRTC Voice Chat Manager
-class VoiceChatManager: ObservableObject {
+class VoiceChatManager: NSObject, ObservableObject {
   @Published var isConnected = false
   @Published var participants: [Participant] = []
   @Published var isMuted = true
@@ -14,7 +14,7 @@ class VoiceChatManager: ObservableObject {
   private var localAudioTrack: RTCAudioTrack?
   private var signalingClient: SignalingClient?
   
-  init() {
+  override init() {
     // Initialize WebRTC
     RTCInitializeSSL()
     let videoEncoderFactory = RTCDefaultVideoEncoderFactory()
@@ -23,10 +23,12 @@ class VoiceChatManager: ObservableObject {
       encoderFactory: videoEncoderFactory,
       decoderFactory: videoDecoderFactory
     )
+    super.init()
   }
   
   deinit {
-    RTCShutdownSSL()
+    // WebRTC cleanup - RTCShutdownSSL is not available in newer versions
+    peerConnections.values.forEach { $0.close() }
   }
   
   func joinGroup(groupId: String) {
@@ -85,7 +87,9 @@ class VoiceChatManager: ObservableObject {
     
     let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
     
-    let peerConnection = peerConnectionFactory.peerConnection(with: configuration, constraints: constraints, delegate: self)
+    guard let peerConnection = peerConnectionFactory.peerConnection(with: configuration, constraints: constraints, delegate: self) else {
+      fatalError("Failed to create peer connection")
+    }
     
     // Add local audio track
     if localAudioTrack == nil {
@@ -93,7 +97,9 @@ class VoiceChatManager: ObservableObject {
       localAudioTrack = peerConnectionFactory.audioTrack(with: audioSource, trackId: "ARDAMSAudioTrack")
     }
     
-    peerConnection.add(localAudioTrack!, streamIds: ["ARDAMS"])
+    if let audioTrack = localAudioTrack {
+      peerConnection.add(audioTrack, streamIds: ["ARDAMS"])
+    }
     
     return peerConnection
   }
@@ -132,7 +138,7 @@ class SignalingClient: NSObject {
   }
   
   func sendMessage(type: String, data: [String: Any]) {
-    let message = [
+    let message: [String: Any] = [
       "type": type,
       "data": data
     ]
@@ -148,7 +154,7 @@ class SignalingClient: NSObject {
   }
   
   func sendWebRTCSignaling(type: String, data: [String: Any], targetUserId: String) {
-    let message = [
+    let message: [String: Any] = [
       "type": "webrtc-signaling",
       "data": [
         "type": type,
@@ -334,12 +340,21 @@ extension VoiceChatManager: SignalingClientDelegate {
       
     case "ice-candidate":
       if let candidateData = data["candidate"] as? [String: Any],
-         let candidate = RTCIceCandidate(
-           sdp: candidateData["candidate"] as? String ?? "",
-           sdpMLineIndex: Int32(candidateData["sdpMLineIndex"] as? Int ?? 0),
-           sdpMid: candidateData["sdpMid"] as? String
-         ) {
-        peerConnection.add(candidate)
+         let candidateString = candidateData["candidate"] as? String,
+         let sdpMLineIndex = candidateData["sdpMLineIndex"] as? Int32,
+         let sdpMid = candidateData["sdpMid"] as? String {
+        
+        let candidate = RTCIceCandidate(
+          sdp: candidateString,
+          sdpMLineIndex: sdpMLineIndex,
+          sdpMid: sdpMid
+        )
+        
+        peerConnection.add(candidate) { error in
+          if let error = error {
+            print("❌ Failed to add ICE candidate: \(error)")
+          }
+        }
       }
       
     default:
@@ -408,13 +423,13 @@ extension VoiceChatManager: RTCPeerConnectionDelegate {
   }
   
   func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-    let candidateData = [
-      "candidate": [
-        "candidate": candidate.sdp,
-        "sdpMLineIndex": candidate.sdpMLineIndex,
-        "sdpMid": candidate.sdpMid
-      ]
-    ]
+            let candidateData: [String: Any] = [
+          "candidate": [
+            "candidate": candidate.sdp,
+            "sdpMLineIndex": candidate.sdpMLineIndex,
+            "sdpMid": candidate.sdpMid ?? ""
+          ]
+        ]
     
     // Find the user ID for this peer connection
     if let userId = peerConnections.first(where: { $0.value == peerConnection })?.key {

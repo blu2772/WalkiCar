@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
 import { RefreshToken } from '../users/entities/refresh-token.entity';
 import { AppleAuthService } from './apple-auth.service';
 import { LoginDto, RefreshTokenDto, AuthResponseDto } from './dto/auth.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginEmailDto } from './dto/login-email.dto';
 
 @Injectable()
 export class AuthService {
@@ -24,14 +27,14 @@ export class AuthService {
     
     // Find or create user
     let user = await this.userRepository.findOne({
-      where: { apple_sub: appleUser.sub },
+      where: { appleSub: appleUser.sub },
     });
 
     if (!user) {
       user = this.userRepository.create({
-        apple_sub: appleUser.sub,
-        display_name: loginDto.displayName || 'User',
-        avatar_url: loginDto.avatarUrl,
+        appleSub: appleUser.sub,
+        displayName: loginDto.displayName || 'User',
+        avatarUrl: loginDto.avatarUrl,
       });
       await this.userRepository.save(user);
     }
@@ -44,8 +47,8 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
       user: {
         id: user.id,
-        display_name: user.display_name,
-        avatar_url: user.avatar_url,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
       },
     };
   }
@@ -56,7 +59,7 @@ export class AuthService {
       relations: ['user'],
     });
 
-    if (!refreshToken || refreshToken.expires_at < new Date()) {
+    if (!refreshToken || refreshToken.expiresAt < new Date()) {
       throw new Error('Invalid or expired refresh token');
     }
 
@@ -71,14 +74,87 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
       user: {
         id: refreshToken.user.id,
-        display_name: refreshToken.user.display_name,
-        avatar_url: refreshToken.user.avatar_url,
+        displayName: refreshToken.user.displayName,
+        avatarUrl: refreshToken.user.avatarUrl,
+      },
+    };
+  }
+
+  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+    // Check if user already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email: registerDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(registerDto.password, saltRounds);
+
+    // Create user
+    const user = this.userRepository.create({
+      email: registerDto.email,
+      passwordHash,
+      displayName: registerDto.displayName,
+      avatarUrl: registerDto.avatarUrl,
+      emailVerified: false, // TODO: Implement email verification
+    });
+
+    await this.userRepository.save(user);
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      },
+    };
+  }
+
+  async signInWithEmail(loginDto: LoginEmailDto): Promise<AuthResponseDto> {
+    // Find user by email
+    const user = await this.userRepository.findOne({
+      where: { email: loginDto.email },
+    });
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
       },
     };
   }
 
   private async generateTokens(user: User) {
-    const payload = { sub: user.id, apple_sub: user.apple_sub };
+    const payload = { 
+      sub: user.id, 
+      email: user.email,
+      appleSub: user.appleSub 
+    };
     
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: process.env.JWT_EXPIRES_IN || '15m',
@@ -90,9 +166,9 @@ export class AuthService {
 
     // Save refresh token to database
     const refreshToken = this.refreshTokenRepository.create({
-      user_id: user.id,
+      userId: user.id,
       token: refreshTokenValue,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     });
     await this.refreshTokenRepository.save(refreshToken);
 

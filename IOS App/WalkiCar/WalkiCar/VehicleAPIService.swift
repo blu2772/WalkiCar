@@ -1,4 +1,6 @@
 // MARK: - API Service Extensions for Vehicles
+
+import Foundation
 extension APIService {
   func getUserVehicles() async throws -> [Vehicle] {
     guard let url = URL(string: "\(baseURL)/vehicles/mine") else {

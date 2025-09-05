@@ -10,20 +10,29 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  apple_sub: string;
+  @Column({ name: 'apple_sub', unique: true, nullable: true })
+  appleSub?: string;
 
-  @Column({ length: 100 })
-  display_name: string;
+  @Column({ unique: true, nullable: true })
+  email?: string;
 
-  @Column({ length: 500, nullable: true })
-  avatar_url: string;
+  @Column({ name: 'password_hash', nullable: true })
+  passwordHash?: string;
 
-  @CreateDateColumn()
-  created_at: Date;
+  @Column({ name: 'display_name', length: 100 })
+  displayName: string;
 
-  @UpdateDateColumn()
-  updated_at: Date;
+  @Column({ name: 'avatar_url', length: 500, nullable: true })
+  avatarUrl?: string;
+
+  @Column({ name: 'email_verified', default: false })
+  emailVerified: boolean;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 
   // Relations
   @OneToMany(() => Friendship, friendship => friendship.user)

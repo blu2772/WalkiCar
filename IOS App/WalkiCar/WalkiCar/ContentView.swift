@@ -1,74 +1,12 @@
 import SwiftUI
-import AVFoundation
+import AuthenticationServices
 import Combine
 
-// MARK: - Audio Routing Manager
-class AudioRoutingManager: ObservableObject {
-  enum AudioMode {
-    case musicPriority    // Default: Spotify in full quality, Voice on iPhone speaker
-    case handsFreePriority // Optional: Allow HFP, document quality loss
-  }
-  
-  @Published var currentMode: AudioMode = .musicPriority
-  @Published var isVoiceActive = false
-  
-  private var audioSession = AVAudioSession.sharedInstance()
-  
-  init() {
-    configureAudioSession()
-  }
-  
-  func configureAudioSession() {
-    do {
-      // Configure for play and record with voice chat mode
-      try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.mixWithOthers, .defaultToSpeaker])
-      
-      // Do NOT set .allowBluetooth or .allowBluetoothA2DP to prevent HFP switching
-      
-      try audioSession.setActive(true)
-      print("🎵 Audio session configured for music priority mode")
-    } catch {
-      print("❌ Failed to configure audio session: \(error)")
-    }
-  }
-  
-  func setAudioMode(_ mode: AudioMode) {
-    currentMode = mode
-    
-    do {
-      switch mode {
-      case .musicPriority:
-        // Keep current configuration (no HFP)
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.mixWithOthers, .defaultToSpeaker])
-        print("🎵 Switched to music priority mode")
-        
-      case .handsFreePriority:
-        // Allow Bluetooth HFP (with quality loss warning)
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth])
-        print("📞 Switched to hands-free priority mode (music quality may be reduced)")
-      }
-      
-      try audioSession.setActive(true)
-    } catch {
-      print("❌ Failed to set audio mode: \(error)")
-    }
-  }
-  
-  func startVoiceSession() {
-    isVoiceActive = true
-    // Additional voice-specific configuration if needed
-  }
-  
-  func endVoiceSession() {
-    isVoiceActive = false
-    // Cleanup voice-specific configuration if needed
-  }
-}
-
 // MARK: - Auth Manager
-class AuthManager: ObservableObject {
+class AuthManager: NSObject, ObservableObject {
   @Published var isAuthenticated = false
   @Published var currentUser: User?
+  @Published var showAppleSignIn = false
   
   private let apiService = APIService()
   
@@ -79,6 +17,30 @@ class AuthManager: ObservableObject {
     let controller = ASAuthorizationController(authorizationRequests: [request])
     controller.delegate = self
     controller.performRequests()
+  }
+  
+  func signInWithEmail(email: String, password: String) async throws {
+    let loginRequest = EmailLoginRequest(email: email, password: password)
+    let response = try await apiService.signInWithEmail(loginRequest)
+    
+    await MainActor.run {
+      self.isAuthenticated = true
+      self.currentUser = response.user
+    }
+  }
+  
+  func registerWithEmail(email: String, password: String, displayName: String) async throws {
+    let registerRequest = EmailRegisterRequest(
+      email: email,
+      password: password,
+      displayName: displayName
+    )
+    let response = try await apiService.registerWithEmail(registerRequest)
+    
+    await MainActor.run {
+      self.isAuthenticated = true
+      self.currentUser = response.user
+    }
   }
   
   func signOut() {
@@ -123,13 +85,25 @@ extension AuthManager: ASAuthorizationControllerDelegate {
 // MARK: - Data Models
 struct User: Codable {
   let id: Int
-  let display_name: String
-  let avatar_url: String?
+  let displayName: String
+  let avatarUrl: String?
 }
 
 struct LoginRequest: Codable {
   let identityToken: String
   let displayName: String?
+  let avatarUrl: String?
+}
+
+struct EmailLoginRequest: Codable {
+  let email: String
+  let password: String
+}
+
+struct EmailRegisterRequest: Codable {
+  let email: String
+  let password: String
+  let displayName: String
   let avatarUrl: String?
 }
 
@@ -141,7 +115,7 @@ struct AuthResponse: Codable {
 
 // MARK: - API Service
 class APIService: ObservableObject {
-  private let baseURL = "http://localhost:3000/api/v1"
+  let baseURL = "http://localhost:3000/api/v1"
   
   func signInWithApple(_ request: LoginRequest) async throws -> AuthResponse {
     guard let url = URL(string: "\(baseURL)/auth/apple") else {
@@ -157,6 +131,46 @@ class APIService: ObservableObject {
     
     guard let httpResponse = response as? HTTPURLResponse,
           httpResponse.statusCode == 200 else {
+      throw APIError.invalidResponse
+    }
+    
+    return try JSONDecoder().decode(AuthResponse.self, from: data)
+  }
+  
+  func signInWithEmail(_ request: EmailLoginRequest) async throws -> AuthResponse {
+    guard let url = URL(string: "\(baseURL)/auth/login") else {
+      throw APIError.invalidURL
+    }
+    
+    var urlRequest = URLRequest(url: url)
+    urlRequest.httpMethod = "POST"
+    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    urlRequest.httpBody = try JSONEncoder().encode(request)
+    
+    let (data, response) = try await URLSession.shared.data(for: urlRequest)
+    
+    guard let httpResponse = response as? HTTPURLResponse,
+          httpResponse.statusCode == 200 else {
+      throw APIError.invalidResponse
+    }
+    
+    return try JSONDecoder().decode(AuthResponse.self, from: data)
+  }
+  
+  func registerWithEmail(_ request: EmailRegisterRequest) async throws -> AuthResponse {
+    guard let url = URL(string: "\(baseURL)/auth/register") else {
+      throw APIError.invalidURL
+    }
+    
+    var urlRequest = URLRequest(url: url)
+    urlRequest.httpMethod = "POST"
+    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    urlRequest.httpBody = try JSONEncoder().encode(request)
+    
+    let (data, response) = try await URLSession.shared.data(for: urlRequest)
+    
+    guard let httpResponse = response as? HTTPURLResponse,
+          httpResponse.statusCode == 201 else {
       throw APIError.invalidResponse
     }
     
@@ -188,6 +202,7 @@ struct ContentView: View {
 // MARK: - Welcome View (Sign In Screen)
 struct WelcomeView: View {
   @EnvironmentObject var authManager: AuthManager
+  @State private var showEmailLogin = false
   
   var body: some View {
     ZStack {
@@ -216,17 +231,53 @@ struct WelcomeView: View {
         
         Spacer()
         
-        // Sign in with Apple button
-        SignInWithAppleButton(.signIn) { request in
-          // Request setup handled by AuthManager
-        } onCompletion: { result in
-          // Completion handled by AuthManager delegate
+        VStack(spacing: 16) {
+          // Email/Password Login Button
+          Button(action: {
+            showEmailLogin = true
+          }) {
+            HStack {
+              Image(systemName: "envelope")
+              Text("Mit Email anmelden")
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(25)
+          }
+          .padding(.horizontal, 40)
+          
+          // Divider
+          HStack {
+            Rectangle()
+              .frame(height: 1)
+              .foregroundColor(.gray)
+            Text("oder")
+              .foregroundColor(.gray)
+              .padding(.horizontal, 16)
+            Rectangle()
+              .frame(height: 1)
+              .foregroundColor(.gray)
+          }
+          .padding(.horizontal, 40)
+          
+          // Sign in with Apple button
+          SignInWithAppleButton(.signIn) { request in
+            // Request setup handled by AuthManager
+          } onCompletion: { result in
+            // Completion handled by AuthManager delegate
+          }
+          .frame(height: 50)
+          .cornerRadius(25)
+          .padding(.horizontal, 40)
         }
-        .frame(height: 50)
-        .cornerRadius(25)
-        .padding(.horizontal, 40)
         .padding(.bottom, 50)
       }
+    }
+    .sheet(isPresented: $showEmailLogin) {
+      EmailLoginView()
+        .environmentObject(authManager)
     }
   }
 }

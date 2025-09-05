@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1A4E359B2E6BA6EC0051F503 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = 1A4E359A2E6BA6EC0051F503 /* WebRTC */; };
+		1A4E359D2E6BA8870051F503 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = 1A4E359C2E6BA8870051F503 /* WebRTC */; };
+		1A4E359F2E6BA8960051F503 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = 1A4E359E2E6BA8960051F503 /* WebRTC */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1A4E35422E6B885B0051F503 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A4E359B2E6BA6EC0051F503 /* WebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A4E359D2E6BA8870051F503 /* WebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -66,6 +74,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A4E359F2E6BA8960051F503 /* WebRTC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +121,7 @@
 			);
 			name = WalkiCar;
 			packageProductDependencies = (
+				1A4E359A2E6BA6EC0051F503 /* WebRTC */,
 			);
 			productName = WalkiCar;
 			productReference = 1A4E35332E6B88590051F503 /* WalkiCar.app */;
@@ -135,6 +145,7 @@
 			);
 			name = WalkiCarTests;
 			packageProductDependencies = (
+				1A4E359C2E6BA8870051F503 /* WebRTC */,
 			);
 			productName = WalkiCarTests;
 			productReference = 1A4E35412E6B885B0051F503 /* WalkiCarTests.xctest */;
@@ -158,6 +169,7 @@
 			);
 			name = WalkiCarUITests;
 			packageProductDependencies = (
+				1A4E359E2E6BA8960051F503 /* WebRTC */,
 			);
 			productName = WalkiCarUITests;
 			productReference = 1A4E354B2E6B885B0051F503 /* WalkiCarUITests.xctest */;
@@ -195,6 +207,9 @@
 			);
 			mainGroup = 1A4E352A2E6B88590051F503;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1A4E35992E6BA6EC0051F503 /* XCRemoteSwiftPackageReference "WebRTC" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1A4E35342E6B88590051F503 /* Products */;
 			projectDirPath = "";
@@ -407,7 +422,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -446,7 +461,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -593,6 +608,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1A4E35992E6BA6EC0051F503 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stasel/WebRTC.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 139.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1A4E359A2E6BA6EC0051F503 /* WebRTC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A4E35992E6BA6EC0051F503 /* XCRemoteSwiftPackageReference "WebRTC" */;
+			productName = WebRTC;
+		};
+		1A4E359C2E6BA8870051F503 /* WebRTC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A4E35992E6BA6EC0051F503 /* XCRemoteSwiftPackageReference "WebRTC" */;
+			productName = WebRTC;
+		};
+		1A4E359E2E6BA8960051F503 /* WebRTC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A4E35992E6BA6EC0051F503 /* XCRemoteSwiftPackageReference "WebRTC" */;
+			productName = WebRTC;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1A4E352B2E6B88590051F503 /* Project object */;
 }
