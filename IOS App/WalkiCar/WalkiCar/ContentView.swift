@@ -8,17 +8,22 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+  @EnvironmentObject var authManager: AuthManager
+  
+  var body: some View {
+    Group {
+      if authManager.isAuthenticated {
+        MainTabView()
+      } else {
+        WelcomeView()
+      }
     }
+    .animation(.easeInOut, value: authManager.isAuthenticated)
+  }
 }
 
 #Preview {
-    ContentView()
+  ContentView()
+    .environmentObject(AuthManager())
+    .environmentObject(AudioRoutingManager())
 }

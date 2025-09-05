@@ -9,9 +9,21 @@ import SwiftUI
 
 @main
 struct WalkiCarApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
+  @StateObject private var authManager = AuthManager()
+  @StateObject private var audioManager = AudioRoutingManager()
+  
+  var body: some Scene {
+    WindowGroup {
+      ContentView()
+        .environmentObject(authManager)
+        .environmentObject(audioManager)
+        .onAppear {
+          configureAudioSession()
         }
     }
+  }
+  
+  private func configureAudioSession() {
+    audioManager.configureAudioSession()
+  }
 }
