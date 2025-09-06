@@ -26,42 +26,67 @@ let server;
 let httpsOptions = null;
 
 // Prüfe ob SSL-Zertifikate vorhanden sind
-// Plesk SSL-Zertifikat-Pfade (Standard-Plesk-Pfade)
-const sslCertPath = process.env.SSL_CERT_PATH || '/usr/local/psa/var/certificates/cert-timrmp.de';
-const sslKeyPath = process.env.SSL_KEY_PATH || '/usr/local/psa/var/certificates/cert-timrmp.de.key';
+// Plesk SSL-Zertifikat-Pfade (verschiedene mögliche Pfade)
+const pleskCertPaths = [
+  '/usr/local/psa/var/certificates/cert-timrmp.de',
+  '/usr/local/psa/var/certificates/scf-timrmp.de'
+];
+
+const pleskKeyPaths = [
+  '/usr/local/psa/var/certificates/cert-timrmp.de.key',
+  '/usr/local/psa/var/certificates/scf-timrmp.de.key'
+];
 
 // Alternative: Let's Encrypt Pfade
 const letsEncryptCertPath = '/etc/letsencrypt/live/timrmp.de/fullchain.pem';
 const letsEncryptKeyPath = '/etc/letsencrypt/live/timrmp.de/privkey.pem';
 
+// Debug: Alle möglichen Pfade auflisten
+console.log('🔍 Suche nach SSL-Zertifikaten...');
+console.log('📁 Prüfe Plesk-Zertifikat-Pfade:');
+pleskCertPaths.forEach(path => {
+  console.log(`   ${fs.existsSync(path) ? '✅' : '❌'} ${path}`);
+});
+
+console.log('📁 Prüfe Plesk-Key-Pfade:');
+pleskKeyPaths.forEach(path => {
+  console.log(`   ${fs.existsSync(path) ? '✅' : '❌'} ${path}`);
+});
+
+console.log('📁 Prüfe Let\'s Encrypt-Pfade:');
+console.log(`   ${fs.existsSync(letsEncryptCertPath) ? '✅' : '❌'} ${letsEncryptCertPath}`);
+console.log(`   ${fs.existsSync(letsEncryptKeyPath) ? '✅' : '❌'} ${letsEncryptKeyPath}`);
+
 // Prüfe zuerst Plesk, dann Let's Encrypt
 let finalCertPath, finalKeyPath;
 
-if (fs.existsSync(sslCertPath) && fs.existsSync(sslKeyPath)) {
-  finalCertPath = sslCertPath;
-  finalKeyPath = sslKeyPath;
-  console.log('🔒 Plesk SSL-Zertifikat gefunden');
-} else if (fs.existsSync(letsEncryptCertPath) && fs.existsSync(letsEncryptKeyPath)) {
+// Suche nach Plesk-Zertifikaten
+for (let i = 0; i < pleskCertPaths.length; i++) {
+  const certPath = pleskCertPaths[i];
+  const keyPath = pleskKeyPaths[i];
+  
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    finalCertPath = certPath;
+    finalKeyPath = keyPath;
+    console.log('🔒 Plesk SSL-Zertifikat gefunden:', certPath);
+    break;
+  }
+}
+
+// Fallback: Let's Encrypt
+if (!finalCertPath && fs.existsSync(letsEncryptCertPath) && fs.existsSync(letsEncryptKeyPath)) {
   finalCertPath = letsEncryptCertPath;
   finalKeyPath = letsEncryptKeyPath;
   console.log('🔒 Let\'s Encrypt SSL-Zertifikat gefunden');
 }
 
-if (finalCertPath && finalKeyPath) {
-  console.log('🔒 SSL-Zertifikate gefunden, HTTPS aktiviert');
-  httpsOptions = {
-    cert: fs.readFileSync(finalCertPath),
-    key: fs.readFileSync(finalKeyPath)
-  };
-  server = createHttpsServer(httpsOptions, app);
-} else {
-  console.log('⚠️  SSL-Zertifikate nicht gefunden, HTTP verwendet');
-  server = createServer(app);
-}
+// Plesk Reverse Proxy verwendet - HTTP ist ausreichend
+console.log('🔄 Plesk Reverse Proxy Modus - HTTP verwendet');
+server = createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || (httpsOptions ? "https://localhost:3000" : "http://localhost:3000"),
+    origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
     methods: ["GET", "POST"]
   }
 });
@@ -69,7 +94,7 @@ const io = new Server(server, {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? 'https://yourdomain.com' : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? 'https://timrmp.de' : 'http://localhost:3000',
   credentials: true
 }));
 
