@@ -15,6 +15,9 @@ struct EmailLoginView: View {
     @State private var password = ""
     @State private var showingForgotPassword = false
     
+    // Callback für Navigation zur Registrierung
+    let onShowRegister: () -> Void
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -91,7 +94,7 @@ struct EmailLoginView: View {
                         
                         Button("Registrieren") {
                             dismiss()
-                            // TODO: Show register view
+                            onShowRegister()
                         }
                         .foregroundColor(.blue)
                     }
@@ -153,5 +156,5 @@ struct EmailTextFieldStyle: TextFieldStyle {
 }
 
 #Preview {
-    EmailLoginView(authManager: AuthManager())
+    EmailLoginView(authManager: AuthManager(), onShowRegister: {})
 }

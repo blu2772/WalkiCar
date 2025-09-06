@@ -18,6 +18,9 @@ struct EmailRegisterView: View {
     @State private var confirmPassword = ""
     @State private var showingSuccess = false
     
+    // Callback für Navigation zum Login
+    let onShowLogin: () -> Void
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -117,7 +120,7 @@ struct EmailRegisterView: View {
                             
                             Button("Anmelden") {
                                 dismiss()
-                                // TODO: Show login view
+                                onShowLogin()
                             }
                             .foregroundColor(.blue)
                         }
@@ -146,7 +149,7 @@ struct EmailRegisterView: View {
     }
     
     private var isFormValid: Bool {
-        !email.isEmpty && 
+        let valid = !email.isEmpty && 
         !username.isEmpty && 
         !displayName.isEmpty && 
         !password.isEmpty && 
@@ -154,17 +157,28 @@ struct EmailRegisterView: View {
         email.contains("@") &&
         password.count >= 8 &&
         password == confirmPassword
+        
+        print("🔍 Form-Validierung: email=\(!email.isEmpty), username=\(!username.isEmpty), displayName=\(!displayName.isEmpty), password=\(!password.isEmpty), confirmPassword=\(!confirmPassword.isEmpty), emailFormat=\(email.contains("@")), passwordLength=\(password.count >= 8), passwordsMatch=\(password == confirmPassword)")
+        print("✅ Formular gültig: \(valid)")
+        
+        return valid
     }
     
     private func register() {
+        print("🚀 Registrierung gestartet für E-Mail: \(email)")
+        print("📝 Formular-Validierung: \(isFormValid)")
+        
         Task {
             do {
+                print("📡 API-Aufruf gestartet...")
                 let response = try await APIClient.shared.registerWithEmail(
                     email: email,
                     username: username,
                     displayName: displayName,
                     password: password
                 )
+                print("✅ Registrierung erfolgreich!")
+                
                 await MainActor.run {
                     APIClient.shared.setAuthToken(response.token)
                     authManager.currentUser = response.user
@@ -172,6 +186,7 @@ struct EmailRegisterView: View {
                     showingSuccess = true
                 }
             } catch {
+                print("❌ Registrierung fehlgeschlagen: \(error.localizedDescription)")
                 await MainActor.run {
                     authManager.errorMessage = error.localizedDescription
                 }
@@ -181,5 +196,5 @@ struct EmailRegisterView: View {
 }
 
 #Preview {
-    EmailRegisterView(authManager: AuthManager())
+    EmailRegisterView(authManager: AuthManager(), onShowLogin: {})
 }

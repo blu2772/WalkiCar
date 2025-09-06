@@ -11,7 +11,7 @@ import AuthenticationServices
 class APIClient: ObservableObject {
     static let shared = APIClient()
     
-    private let baseURL = "http://localhost:3000/api"
+    private let baseURL = "http://timrmp.de:3000/api"
     private var authToken: String?
     
     private init() {
@@ -49,6 +49,8 @@ class APIClient: ObservableObject {
         _ = try await makeRequest(
             endpoint: "/auth/logout",
             method: "POST",
+            body: Optional<[String: String]>.none,
+            responseType: [String: String].self,
             requiresAuth: true
         )
         clearAuthToken()
@@ -58,6 +60,8 @@ class APIClient: ObservableObject {
         return try await makeRequest(
             endpoint: "/auth/refresh",
             method: "POST",
+            body: Optional<[String: String]>.none,
+            responseType: AuthResponse.self,
             requiresAuth: true
         )
     }
@@ -65,18 +69,28 @@ class APIClient: ObservableObject {
     // MARK: - Email/Password Authentication
     
     func registerWithEmail(email: String, username: String, displayName: String, password: String) async throws -> AuthResponse {
+        print("📧 APIClient: E-Mail-Registrierung gestartet")
+        print("📧 E-Mail: \(email)")
+        print("📧 Username: \(username)")
+        print("📧 Display Name: \(displayName)")
+        
         let request = EmailRegisterRequest(
             email: email,
             username: username,
             displayName: displayName,
             password: password
         )
-        return try await makeRequest(
+        
+        print("📧 Request erstellt, API-Aufruf gestartet...")
+        let response = try await makeRequest(
             endpoint: "/auth/register-email",
             method: "POST",
             body: request,
             requiresAuth: false
         )
+        print("📧 API-Antwort erhalten: \(response)")
+        
+        return response
     }
     
     func loginWithEmail(email: String, password: String) async throws -> AuthResponse {
@@ -95,6 +109,7 @@ class APIClient: ObservableObject {
             endpoint: "/auth/forgot-password",
             method: "POST",
             body: request,
+            responseType: [String: String].self,
             requiresAuth: false
         )
     }
@@ -105,13 +120,14 @@ class APIClient: ObservableObject {
             endpoint: "/auth/reset-password",
             method: "POST",
             body: request,
+            responseType: [String: String].self,
             requiresAuth: false
         )
     }
     
     func verifyEmail(token: String) async throws {
         let request = ["token": token]
-        _ = try await makeRequest(
+        _ = try await makeRequestDict(
             endpoint: "/auth/verify-email",
             method: "POST",
             body: request,
@@ -123,7 +139,7 @@ class APIClient: ObservableObject {
     
     func sendFriendRequest(username: String) async throws {
         let request = ["friend_username": username]
-        _ = try await makeRequest(
+        _ = try await makeRequestDict(
             endpoint: "/friends/request",
             method: "POST",
             body: request,
@@ -135,6 +151,8 @@ class APIClient: ObservableObject {
         return try await makeRequest(
             endpoint: "/friends/requests",
             method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: FriendRequestResponse.self,
             requiresAuth: true
         )
     }
@@ -145,6 +163,7 @@ class APIClient: ObservableObject {
             endpoint: "/friends/action",
             method: "PUT",
             body: request,
+            responseType: [String: String].self,
             requiresAuth: true
         )
     }
@@ -153,12 +172,14 @@ class APIClient: ObservableObject {
         return try await makeRequest(
             endpoint: "/friends/list",
             method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: FriendsListResponse.self,
             requiresAuth: true
         )
     }
     
     func removeFriend(friendshipId: Int) async throws {
-        _ = try await makeRequest(
+        _ = try await makeRequestDict(
             endpoint: "/friends/remove/\(friendshipId)",
             method: "DELETE",
             requiresAuth: true
@@ -169,6 +190,8 @@ class APIClient: ObservableObject {
         return try await makeRequest(
             endpoint: "/friends/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
             method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: UserSearchResponse.self,
             requiresAuth: true
         )
     }
@@ -202,7 +225,10 @@ class APIClient: ObservableObject {
         responseType: U.Type = U.self,
         requiresAuth: Bool = true
     ) async throws -> U {
+        print("🌐 API-Aufruf: \(method) \(baseURL + endpoint)")
+        
         guard let url = URL(string: baseURL + endpoint) else {
+            print("❌ Ungültige URL: \(baseURL + endpoint)")
             throw APIError.invalidURL
         }
         
@@ -212,37 +238,49 @@ class APIClient: ObservableObject {
         
         if requiresAuth, let token = authToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("🔐 Auth-Token gesetzt")
         }
         
         if let body = body {
             request.httpBody = try JSONEncoder().encode(body)
+            print("📦 Request Body gesetzt")
         }
         
+        print("📡 HTTP-Request wird gesendet...")
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Ungültige HTTP-Response")
             throw APIError.invalidResponse
         }
         
+        print("📊 HTTP-Status: \(httpResponse.statusCode)")
+        
         if httpResponse.statusCode == 401 {
+            print("🔒 Unauthorized - Token wird gelöscht")
             clearAuthToken()
             throw APIError.unauthorized
         }
         
         guard httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 else {
+            print("❌ Server-Fehler: \(httpResponse.statusCode)")
             let errorMessage = try? JSONDecoder().decode(APIErrorMessage.self, from: data)
+            print("❌ Fehler-Message: \(errorMessage?.error ?? "Unbekannter Serverfehler")")
             throw APIError.serverError(errorMessage?.error ?? "Unbekannter Serverfehler")
         }
         
         do {
-            return try JSONDecoder().decode(U.self, from: data)
+            let result = try JSONDecoder().decode(U.self, from: data)
+            print("✅ Response erfolgreich dekodiert")
+            return result
         } catch {
-            print("Decoding error: \(error)")
+            print("❌ Decoding-Fehler: \(error)")
+            print("📄 Response Data: \(String(data: data, encoding: .utf8) ?? "Keine Daten")")
             throw APIError.decodingError
         }
     }
     
-    private func makeRequest(
+    private func makeRequestDict(
         endpoint: String,
         method: String,
         body: [String: Any]? = nil,

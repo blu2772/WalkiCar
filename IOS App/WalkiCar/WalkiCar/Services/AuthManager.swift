@@ -59,7 +59,7 @@ class AuthManager: NSObject, ObservableObject {
         }
     }
     
-    private func handleAppleSignIn(credential: ASAuthorizationAppleIDCredential) {
+    func handleAppleSignIn(credential: ASAuthorizationAppleIDCredential) {
         guard let identityToken = credential.identityToken,
               let identityTokenString = String(data: identityToken, encoding: .utf8) else {
             errorMessage = "Fehler beim Verarbeiten der Apple-Anmeldung"

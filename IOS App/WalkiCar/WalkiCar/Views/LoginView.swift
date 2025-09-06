@@ -126,10 +126,14 @@ struct LoginView: View {
             }
         }
         .sheet(isPresented: $showingEmailLogin) {
-            EmailLoginView(authManager: authManager)
+            EmailLoginView(authManager: authManager) {
+                showingEmailRegister = true
+            }
         }
         .sheet(isPresented: $showingEmailRegister) {
-            EmailRegisterView(authManager: authManager)
+            EmailRegisterView(authManager: authManager) {
+                showingEmailLogin = true
+            }
         }
         .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
             Button("OK") {
@@ -141,82 +145,6 @@ struct LoginView: View {
     }
 }
 
-// MARK: - AuthManager Extension for LoginView
-
-extension AuthManager {
-    func handleAppleSignIn(credential: ASAuthorizationAppleIDCredential) {
-        isLoading = true
-        errorMessage = nil
-        
-        guard let identityToken = credential.identityToken,
-              let identityTokenString = String(data: identityToken, encoding: .utf8) else {
-            errorMessage = "Fehler beim Verarbeiten der Apple-Anmeldung"
-            isLoading = false
-            return
-        }
-        
-        let email = credential.email ?? ""
-        let fullName = credential.fullName
-        let displayName = [fullName?.givenName, fullName?.familyName]
-            .compactMap { $0 }
-            .joined(separator: " ")
-        
-        Task {
-            do {
-                // Versuche zuerst Login
-                let response = try await APIClient.shared.signInWithApple(
-                    appleId: identityTokenString,
-                    email: email
-                )
-                
-                await MainActor.run {
-                    APIClient.shared.setAuthToken(response.token)
-                    currentUser = response.user
-                    isAuthenticated = true
-                    isLoading = false
-                }
-            } catch {
-                // Wenn Login fehlschlägt, versuche Registrierung
-                if email.isEmpty {
-                    await MainActor.run {
-                        errorMessage = "E-Mail-Adresse ist für die Registrierung erforderlich"
-                        isLoading = false
-                    }
-                    return
-                }
-                
-                do {
-                    let username = generateUsername(from: email)
-                    let response = try await APIClient.shared.registerWithApple(
-                        appleId: identityTokenString,
-                        email: email,
-                        username: username,
-                        displayName: displayName.isEmpty ? username : displayName
-                    )
-                    
-                    await MainActor.run {
-                        APIClient.shared.setAuthToken(response.token)
-                        currentUser = response.user
-                        isAuthenticated = true
-                        isLoading = false
-                    }
-                } catch {
-                    await MainActor.run {
-                        errorMessage = error.localizedDescription
-                        isLoading = false
-                    }
-                }
-            }
-        }
-    }
-    
-    private func generateUsername(from email: String) -> String {
-        let emailPrefix = email.components(separatedBy: "@").first ?? "user"
-        let cleanPrefix = emailPrefix.replacingOccurrences(of: "[^a-zA-Z0-9]", with: "", options: .regularExpression)
-        let timestamp = Int(Date().timeIntervalSince1970)
-        return "\(cleanPrefix)\(timestamp)"
-    }
-}
 
 #Preview {
     LoginView()
