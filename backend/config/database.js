@@ -8,9 +8,9 @@ const connectDB = async () => {
     connection = await mysql.createConnection({
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER || 'root',
+      user: process.env.DB_USER || 'walkicar',
       password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'walkicar_db',
+      database: process.env.DB_NAME || 'walkicar',
       charset: 'utf8mb4',
       timezone: '+00:00'
     });
