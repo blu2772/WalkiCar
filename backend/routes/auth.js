@@ -98,13 +98,18 @@ router.post('/register', async (req, res) => {
     );
 
     res.status(201).json({
-      message: 'Benutzer erfolgreich registriert',
+      message: 'Benutzer erfolgreich registriert. Bitte überprüfe deine E-Mails zur Verifizierung.',
       token,
       user: {
         id: userId,
         username,
         display_name,
-        email
+        email,
+        email_verified: false,
+        profile_picture_url: null,
+        is_online: false,
+        last_seen: null,
+        created_at: new Date().toISOString()
       }
     });
 
@@ -190,7 +195,11 @@ router.post('/register-email', async (req, res) => {
         username,
         display_name,
         email,
-        email_verified: false
+        email_verified: false,
+        profile_picture_url: null,
+        is_online: true,
+        last_seen: new Date().toISOString(),
+        created_at: new Date().toISOString()
       }
     });
 
@@ -253,7 +262,12 @@ router.post('/login', async (req, res) => {
         id: userData.id,
         username: userData.username,
         display_name: userData.display_name,
-        email: userData.email
+        email: userData.email,
+        email_verified: true,
+        profile_picture_url: null,
+        is_online: true,
+        last_seen: new Date().toISOString(),
+        created_at: null
       }
     });
 
@@ -323,7 +337,11 @@ router.post('/login-email', async (req, res) => {
         username: userData.username,
         display_name: userData.display_name,
         email: userData.email,
-        email_verified: userData.email_verified
+        email_verified: Boolean(userData.email_verified),
+        profile_picture_url: null,
+        is_online: true,
+        last_seen: new Date().toISOString(),
+        created_at: null
       }
     });
 

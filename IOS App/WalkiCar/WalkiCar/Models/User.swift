@@ -12,8 +12,9 @@ struct User: Codable, Identifiable {
     let username: String
     let displayName: String
     let email: String
+    let emailVerified: Bool
     let profilePictureUrl: String?
-    let isOnline: Bool
+    let isOnline: Bool?
     let lastSeen: String?
     let createdAt: String?
     
@@ -22,6 +23,7 @@ struct User: Codable, Identifiable {
         case username
         case displayName = "display_name"
         case email
+        case emailVerified = "email_verified"
         case profilePictureUrl = "profile_picture_url"
         case isOnline = "is_online"
         case lastSeen = "last_seen"
