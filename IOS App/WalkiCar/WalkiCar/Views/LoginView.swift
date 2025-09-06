@@ -1,0 +1,174 @@
+//
+//  LoginView.swift
+//  WalkiCar
+//
+//  Created by Tim Rempel on 05.09.25.
+//
+
+import SwiftUI
+import AuthenticationServices
+
+struct LoginView: View {
+    @StateObject private var authManager = AuthManager()
+    
+    var body: some View {
+        ZStack {
+            // Dark background
+            Color.black
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                Spacer()
+                
+                // Welcome text
+                Text("Welcome!")
+                    .font(.system(size: 48, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .padding(.bottom, 40)
+                
+                // Car image placeholder
+                VStack {
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 120))
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 20)
+                    
+                    Text("Sign in to connect with friends")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                .padding(.bottom, 60)
+                
+                Spacer()
+                
+                // Apple Sign In Button
+                SignInWithAppleButton(
+                    onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    },
+                    onCompletion: { result in
+                        switch result {
+                        case .success(let authorization):
+                            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                                authManager.handleAppleSignIn(credential: appleIDCredential)
+                            }
+                        case .failure(let error):
+                            authManager.errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .cornerRadius(25)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 50)
+            }
+            
+            // Loading overlay
+            if authManager.isLoading {
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+                
+                VStack {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                    
+                    Text("Anmeldung läuft...")
+                        .foregroundColor(.white)
+                        .padding(.top, 20)
+                }
+            }
+        }
+        .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
+            Button("OK") {
+                authManager.errorMessage = nil
+            }
+        } message: {
+            Text(authManager.errorMessage ?? "")
+        }
+    }
+}
+
+// MARK: - AuthManager Extension for LoginView
+
+extension AuthManager {
+    func handleAppleSignIn(credential: ASAuthorizationAppleIDCredential) {
+        isLoading = true
+        errorMessage = nil
+        
+        guard let identityToken = credential.identityToken,
+              let identityTokenString = String(data: identityToken, encoding: .utf8) else {
+            errorMessage = "Fehler beim Verarbeiten der Apple-Anmeldung"
+            isLoading = false
+            return
+        }
+        
+        let email = credential.email ?? ""
+        let fullName = credential.fullName
+        let displayName = [fullName?.givenName, fullName?.familyName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        
+        Task {
+            do {
+                // Versuche zuerst Login
+                let response = try await APIClient.shared.signInWithApple(
+                    appleId: identityTokenString,
+                    email: email
+                )
+                
+                await MainActor.run {
+                    APIClient.shared.setAuthToken(response.token)
+                    currentUser = response.user
+                    isAuthenticated = true
+                    isLoading = false
+                }
+            } catch {
+                // Wenn Login fehlschlägt, versuche Registrierung
+                if email.isEmpty {
+                    await MainActor.run {
+                        errorMessage = "E-Mail-Adresse ist für die Registrierung erforderlich"
+                        isLoading = false
+                    }
+                    return
+                }
+                
+                do {
+                    let username = generateUsername(from: email)
+                    let response = try await APIClient.shared.registerWithApple(
+                        appleId: identityTokenString,
+                        email: email,
+                        username: username,
+                        displayName: displayName.isEmpty ? username : displayName
+                    )
+                    
+                    await MainActor.run {
+                        APIClient.shared.setAuthToken(response.token)
+                        currentUser = response.user
+                        isAuthenticated = true
+                        isLoading = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = error.localizedDescription
+                        isLoading = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func generateUsername(from email: String) -> String {
+        let emailPrefix = email.components(separatedBy: "@").first ?? "user"
+        let cleanPrefix = emailPrefix.replacingOccurrences(of: "[^a-zA-Z0-9]", with: "", options: .regularExpression)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        return "\(cleanPrefix)\(timestamp)"
+    }
+}
+
+#Preview {
+    LoginView()
+}
