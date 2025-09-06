@@ -26,14 +26,32 @@ let server;
 let httpsOptions = null;
 
 // Prüfe ob SSL-Zertifikate vorhanden sind
-const sslCertPath = process.env.SSL_CERT_PATH || '/etc/letsencrypt/live/timrmp.de/fullchain.pem';
-const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/letsencrypt/live/timrmp.de/privkey.pem';
+// Plesk SSL-Zertifikat-Pfade (Standard-Plesk-Pfade)
+const sslCertPath = process.env.SSL_CERT_PATH || '/usr/local/psa/var/certificates/cert-timrmp.de';
+const sslKeyPath = process.env.SSL_KEY_PATH || '/usr/local/psa/var/certificates/cert-timrmp.de.key';
+
+// Alternative: Let's Encrypt Pfade
+const letsEncryptCertPath = '/etc/letsencrypt/live/timrmp.de/fullchain.pem';
+const letsEncryptKeyPath = '/etc/letsencrypt/live/timrmp.de/privkey.pem';
+
+// Prüfe zuerst Plesk, dann Let's Encrypt
+let finalCertPath, finalKeyPath;
 
 if (fs.existsSync(sslCertPath) && fs.existsSync(sslKeyPath)) {
+  finalCertPath = sslCertPath;
+  finalKeyPath = sslKeyPath;
+  console.log('🔒 Plesk SSL-Zertifikat gefunden');
+} else if (fs.existsSync(letsEncryptCertPath) && fs.existsSync(letsEncryptKeyPath)) {
+  finalCertPath = letsEncryptCertPath;
+  finalKeyPath = letsEncryptKeyPath;
+  console.log('🔒 Let\'s Encrypt SSL-Zertifikat gefunden');
+}
+
+if (finalCertPath && finalKeyPath) {
   console.log('🔒 SSL-Zertifikate gefunden, HTTPS aktiviert');
   httpsOptions = {
-    cert: fs.readFileSync(sslCertPath),
-    key: fs.readFileSync(sslKeyPath)
+    cert: fs.readFileSync(finalCertPath),
+    key: fs.readFileSync(finalKeyPath)
   };
   server = createHttpsServer(httpsOptions, app);
 } else {
