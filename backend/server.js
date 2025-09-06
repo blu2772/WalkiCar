@@ -94,7 +94,7 @@ const io = new Server(server, {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? 'https://timrmp.de' : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? 'https://walkcar.timrmp.de' : 'http://localhost:3000',
   credentials: true
 }));
 

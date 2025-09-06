@@ -11,7 +11,7 @@ import AuthenticationServices
 class APIClient: ObservableObject {
     static let shared = APIClient()
     
-    private let baseURL = "https://timrmp.de/api"
+    private let baseURL = "https://walkcar.timrmp.de/api"
     private var authToken: String?
     
     private init() {
