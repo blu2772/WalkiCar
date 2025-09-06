@@ -11,7 +11,7 @@ import AuthenticationServices
 class APIClient: ObservableObject {
     static let shared = APIClient()
     
-    private let baseURL = "http://timrmp.de:3000/api"
+    private let baseURL = "https://timrmp.de:3000/api"
     private var authToken: String?
     
     private init() {
@@ -86,6 +86,7 @@ class APIClient: ObservableObject {
             endpoint: "/auth/register-email",
             method: "POST",
             body: request,
+            responseType: AuthResponse.self,
             requiresAuth: false
         )
         print("📧 API-Antwort erhalten: \(response)")
@@ -244,10 +245,20 @@ class APIClient: ObservableObject {
         if let body = body {
             request.httpBody = try JSONEncoder().encode(body)
             print("📦 Request Body gesetzt")
+            if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
+                print("📦 Request Body Inhalt: \(bodyString)")
+            }
         }
         
         print("📡 HTTP-Request wird gesendet...")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // Benutzerdefinierte URLSession für HTTP-Verbindungen
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        
+        let session = URLSession(configuration: config)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ Ungültige HTTP-Response")
@@ -272,6 +283,9 @@ class APIClient: ObservableObject {
         do {
             let result = try JSONDecoder().decode(U.self, from: data)
             print("✅ Response erfolgreich dekodiert")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📄 Response Data: \(responseString)")
+            }
             return result
         } catch {
             print("❌ Decoding-Fehler: \(error)")

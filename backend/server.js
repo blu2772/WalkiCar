@@ -3,7 +3,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { createServer } = require('http');
+const { createServer: createHttpsServer } = require('https');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -17,10 +20,30 @@ const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
-const server = createServer(app);
+
+// HTTPS-Konfiguration
+let server;
+let httpsOptions = null;
+
+// Prüfe ob SSL-Zertifikate vorhanden sind
+const sslCertPath = process.env.SSL_CERT_PATH || '/etc/letsencrypt/live/timrmp.de/fullchain.pem';
+const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/letsencrypt/live/timrmp.de/privkey.pem';
+
+if (fs.existsSync(sslCertPath) && fs.existsSync(sslKeyPath)) {
+  console.log('🔒 SSL-Zertifikate gefunden, HTTPS aktiviert');
+  httpsOptions = {
+    cert: fs.readFileSync(sslCertPath),
+    key: fs.readFileSync(sslKeyPath)
+  };
+  server = createHttpsServer(httpsOptions, app);
+} else {
+  console.log('⚠️  SSL-Zertifikate nicht gefunden, HTTP verwendet');
+  server = createServer(app);
+}
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+    origin: process.env.SOCKET_CORS_ORIGIN || (httpsOptions ? "https://localhost:3000" : "http://localhost:3000"),
     methods: ["GET", "POST"]
   }
 });
@@ -113,8 +136,14 @@ const startServer = async () => {
   try {
     await connectDB();
     server.listen(PORT, () => {
-      console.log(`🚗 WalkiCar Backend läuft auf Port ${PORT}`);
+      const protocol = httpsOptions ? 'https' : 'http';
+      console.log(`🚗 WalkiCar Backend läuft auf ${protocol}://localhost:${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      if (httpsOptions) {
+        console.log('🔒 HTTPS aktiviert');
+      } else {
+        console.log('⚠️  HTTP verwendet (SSL-Zertifikate nicht gefunden)');
+      }
     });
   } catch (error) {
     console.error('Fehler beim Starten des Servers:', error);
