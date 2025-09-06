@@ -10,6 +10,8 @@ import AuthenticationServices
 
 struct LoginView: View {
     @StateObject private var authManager = AuthManager()
+    @State private var showingEmailLogin = false
+    @State private var showingEmailRegister = false
     
     var body: some View {
         ZStack {
@@ -43,25 +45,66 @@ struct LoginView: View {
                 
                 Spacer()
                 
-                // Apple Sign In Button
-                SignInWithAppleButton(
-                    onRequest: { request in
-                        request.requestedScopes = [.fullName, .email]
-                    },
-                    onCompletion: { result in
-                        switch result {
-                        case .success(let authorization):
-                            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                                authManager.handleAppleSignIn(credential: appleIDCredential)
+                // Login options
+                VStack(spacing: 16) {
+                    // Apple Sign In Button
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            switch result {
+                            case .success(let authorization):
+                                if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                                    authManager.handleAppleSignIn(credential: appleIDCredential)
+                                }
+                            case .failure(let error):
+                                authManager.errorMessage = error.localizedDescription
                             }
-                        case .failure(let error):
-                            authManager.errorMessage = error.localizedDescription
                         }
+                    )
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 50)
+                    .cornerRadius(25)
+                    
+                    // Divider
+                    HStack {
+                        Rectangle()
+                            .fill(Color.gray)
+                            .frame(height: 1)
+                        
+                        Text("oder")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 14))
+                            .padding(.horizontal, 16)
+                        
+                        Rectangle()
+                            .fill(Color.gray)
+                            .frame(height: 1)
                     }
-                )
-                .signInWithAppleButtonStyle(.white)
-                .frame(height: 50)
-                .cornerRadius(25)
+                    .padding(.horizontal, 40)
+                    
+                    // Email/Password Login Button
+                    Button(action: {
+                        showingEmailLogin = true
+                    }) {
+                        HStack {
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 16))
+                            Text("Mit E-Mail anmelden")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(25)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 25)
+                                .stroke(Color.gray, lineWidth: 1)
+                        )
+                    }
+                }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 50)
             }
@@ -81,6 +124,12 @@ struct LoginView: View {
                         .padding(.top, 20)
                 }
             }
+        }
+        .sheet(isPresented: $showingEmailLogin) {
+            EmailLoginView(authManager: authManager)
+        }
+        .sheet(isPresented: $showingEmailRegister) {
+            EmailRegisterView(authManager: authManager)
         }
         .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
             Button("OK") {

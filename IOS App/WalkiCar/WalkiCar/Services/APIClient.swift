@@ -62,6 +62,63 @@ class APIClient: ObservableObject {
         )
     }
     
+    // MARK: - Email/Password Authentication
+    
+    func registerWithEmail(email: String, username: String, displayName: String, password: String) async throws -> AuthResponse {
+        let request = EmailRegisterRequest(
+            email: email,
+            username: username,
+            displayName: displayName,
+            password: password
+        )
+        return try await makeRequest(
+            endpoint: "/auth/register-email",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+    }
+    
+    func loginWithEmail(email: String, password: String) async throws -> AuthResponse {
+        let request = EmailLoginRequest(email: email, password: password)
+        return try await makeRequest(
+            endpoint: "/auth/login-email",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+    }
+    
+    func forgotPassword(email: String) async throws {
+        let request = PasswordResetRequest(email: email)
+        _ = try await makeRequest(
+            endpoint: "/auth/forgot-password",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+    }
+    
+    func resetPassword(token: String, password: String) async throws {
+        let request = PasswordResetConfirmRequest(token: token, password: password)
+        _ = try await makeRequest(
+            endpoint: "/auth/reset-password",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+    }
+    
+    func verifyEmail(token: String) async throws {
+        let request = ["token": token]
+        _ = try await makeRequest(
+            endpoint: "/auth/verify-email",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+    }
+    
     // MARK: - Friends
     
     func sendFriendRequest(username: String) async throws {
@@ -258,4 +315,34 @@ enum APIError: Error, LocalizedError {
 
 struct APIErrorMessage: Codable {
     let error: String
+}
+
+// MARK: - Request Models
+
+struct EmailRegisterRequest: Codable {
+    let email: String
+    let username: String
+    let displayName: String
+    let password: String
+    
+    enum CodingKeys: String, CodingKey {
+        case email
+        case username
+        case displayName = "display_name"
+        case password
+    }
+}
+
+struct EmailLoginRequest: Codable {
+    let email: String
+    let password: String
+}
+
+struct PasswordResetRequest: Codable {
+    let email: String
+}
+
+struct PasswordResetConfirmRequest: Codable {
+    let token: String
+    let password: String
 }

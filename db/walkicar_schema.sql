@@ -8,17 +8,21 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(50) UNIQUE NOT NULL,
     display_name VARCHAR(100),
+    password_hash VARCHAR(255),
     profile_picture_url VARCHAR(500),
     is_online BOOLEAN DEFAULT FALSE,
     last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
+    email_verified BOOLEAN DEFAULT FALSE,
+    auth_provider ENUM('apple', 'email') DEFAULT 'email',
     
     INDEX idx_apple_id (apple_id),
     INDEX idx_email (email),
     INDEX idx_username (username),
-    INDEX idx_online_status (is_online)
+    INDEX idx_online_status (is_online),
+    INDEX idx_auth_provider (auth_provider)
 );
 
 -- Freundschaften Tabelle
@@ -173,6 +177,36 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_sessions (user_id),
     INDEX idx_token_hash (token_hash),
+    INDEX idx_expires_at (expires_at)
+);
+
+-- Passwort-Reset-Tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_reset_tokens (user_id),
+    INDEX idx_token (token),
+    INDEX idx_expires_at (expires_at)
+);
+
+-- E-Mail-Verifizierung-Tokens
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_verification_tokens (user_id),
+    INDEX idx_token (token),
     INDEX idx_expires_at (expires_at)
 );
 
