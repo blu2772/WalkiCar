@@ -119,6 +119,25 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Test-Route für Datenbankverbindung
+router.get('/test-db', async (req, res) => {
+  try {
+    const result = await query('SELECT 1 as test');
+    res.json({ 
+      status: 'OK', 
+      database: 'Connected',
+      test: result[0].test 
+    });
+  } catch (error) {
+    console.error('Datenbank-Test-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Datenbankverbindung fehlgeschlagen',
+      details: error.message,
+      code: error.code
+    });
+  }
+});
+
 // E-Mail/Passwort Registrierung
 router.post('/register-email', async (req, res) => {
   try {
