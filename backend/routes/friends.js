@@ -174,6 +174,34 @@ router.put('/action', async (req, res) => {
   }
 });
 
+// Admin-Route zum Korrigieren von Freundschaftsstatus
+router.put('/admin/fix-status/:friendship_id', async (req, res) => {
+  try {
+    const { friendship_id } = req.params;
+    const { status } = req.body;
+    
+    if (!status || !['pending', 'accepted', 'declined', 'blocked'].includes(status)) {
+      return res.status(400).json({ error: 'Ungültiger Status' });
+    }
+    
+    await query(
+      'UPDATE friendships SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, friendship_id]
+    );
+    
+    res.json({ 
+      message: `Freundschaftsstatus auf '${status}' gesetzt`,
+      friendship_id: friendship_id
+    });
+  } catch (error) {
+    console.error('Admin-Status-Fix-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Status konnte nicht korrigiert werden',
+      details: error.message
+    });
+  }
+});
+
 // Debug-Route für Freundschaften
 router.get('/debug-friendships', async (req, res) => {
   try {
