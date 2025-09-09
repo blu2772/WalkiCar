@@ -209,6 +209,59 @@ class APIClient: ObservableObject {
         return response
     }
     
+    // MARK: - Car Management
+    
+    func getGarage() async throws -> GarageResponse {
+        print("🌐 APIClient: Lade Garage...")
+        return try await makeRequest(
+            endpoint: "/cars/garage",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: GarageResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func createCar(_ request: CarCreateRequest) async throws -> CarCreateResponse {
+        print("🌐 APIClient: Erstelle Fahrzeug: \(request.name)")
+        return try await makeRequest(
+            endpoint: "/cars/create",
+            method: "POST",
+            body: request,
+            responseType: CarCreateResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func updateCar(carId: Int, request: CarUpdateRequest) async throws -> CarUpdateResponse {
+        print("🌐 APIClient: Aktualisiere Fahrzeug ID: \(carId)")
+        return try await makeRequest(
+            endpoint: "/cars/update/\(carId)",
+            method: "PUT",
+            body: request,
+            responseType: CarUpdateResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func deleteCar(carId: Int) async throws {
+        print("🌐 APIClient: Lösche Fahrzeug ID: \(carId)")
+        _ = try await makeRequestDict(
+            endpoint: "/cars/delete/\(carId)",
+            method: "DELETE",
+            requiresAuth: true
+        )
+    }
+    
+    func setActiveCar(carId: Int) async throws {
+        print("🌐 APIClient: Setze aktives Fahrzeug ID: \(carId)")
+        _ = try await makeRequestDict(
+            endpoint: "/cars/set-active/\(carId)",
+            method: "PUT",
+            requiresAuth: true
+        )
+    }
+    
     // MARK: - Token Management
     
     func setAuthToken(_ token: String) {
