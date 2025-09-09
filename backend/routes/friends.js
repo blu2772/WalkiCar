@@ -148,12 +148,10 @@ router.put('/action', async (req, res) => {
     }
 
     // Führe die Aktion aus
-    await transaction([
-      {
-        sql: 'UPDATE friendships SET status = ? WHERE id = ?',
-        params: [action, friendship_id]
-      }
-    ]);
+    await query(
+      'UPDATE friendships SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [action, friendship_id]
+    );
 
     // Wenn angenommen, erstelle Benachrichtigung für den ursprünglichen Sender
     if (action === 'accept') {
