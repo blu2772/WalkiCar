@@ -105,10 +105,16 @@ class FriendsManager: ObservableObject {
     }
     
     func searchUsers(query: String) async -> [UserSearchResult] {
+        print("🔍 FriendsManager: Suche nach '\(query)'")
         do {
             let response = try await apiClient.searchUsers(query: query)
+            print("📊 FriendsManager: API-Antwort erhalten: \(response.users.count) Benutzer")
+            for user in response.users {
+                print("👤 FriendsManager: \(user.username) (\(user.displayName)) - Status: \(user.relationshipStatus)")
+            }
             return response.users
         } catch {
+            print("❌ FriendsManager: Fehler bei der Suche: \(error.localizedDescription)")
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
             }

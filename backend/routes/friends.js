@@ -176,6 +176,37 @@ router.put('/action', async (req, res) => {
   }
 });
 
+// Debug-Route für Freundschaften
+router.get('/debug-friendships', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Alle Freundschaften für diesen Benutzer
+    const allFriendships = await query(
+      'SELECT * FROM friendships WHERE user_id = ? OR friend_id = ? ORDER BY created_at DESC',
+      [userId, userId]
+    );
+    
+    // Benutzer-Info
+    const userInfo = await query(
+      'SELECT id, username, display_name FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    res.json({
+      user: userInfo[0],
+      all_friendships: allFriendships,
+      count: allFriendships.length
+    });
+  } catch (error) {
+    console.error('Debug-Freundschaften-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Debug-Fehler',
+      details: error.message
+    });
+  }
+});
+
 // Freundesliste abrufen
 router.get('/list', async (req, res) => {
   try {

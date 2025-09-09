@@ -188,13 +188,25 @@ class APIClient: ObservableObject {
     }
     
     func searchUsers(query: String) async throws -> UserSearchResponse {
-        return try await makeRequest(
-            endpoint: "/friends/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
+        print("🌐 APIClient: Suche nach '\(query)'")
+        print("🔑 APIClient: Auth Token vorhanden: \(authToken != nil)")
+        if let token = authToken {
+            print("🔑 APIClient: Token (erste 20 Zeichen): \(String(token.prefix(20)))...")
+        }
+        
+        let endpoint = "/friends/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        print("🌐 APIClient: Endpoint: \(endpoint)")
+        
+        let response = try await makeRequest(
+            endpoint: endpoint,
             method: "GET",
             body: Optional<[String: String]>.none,
             responseType: UserSearchResponse.self,
             requiresAuth: true
         )
+        
+        print("📊 APIClient: Suche erfolgreich: \(response.users.count) Benutzer gefunden")
+        return response
     }
     
     // MARK: - Token Management

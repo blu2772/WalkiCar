@@ -109,14 +109,22 @@ struct AddFriendView: View {
     private func performSearch() {
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
+        print("🔍 iOS: Suche gestartet für: '\(searchText)'")
         isSearching = true
         searchResults = []
         
         Task {
+            print("📡 iOS: API-Aufruf gestartet...")
             let results = await friendsManager.searchUsers(query: searchText)
+            print("📊 iOS: API-Antwort erhalten: \(results.count) Benutzer")
+            for result in results {
+                print("👤 iOS: Benutzer gefunden: \(result.username) (\(result.displayName))")
+            }
+            
             await MainActor.run {
                 searchResults = results
                 isSearching = false
+                print("✅ iOS: Suche abgeschlossen, \(results.count) Ergebnisse angezeigt")
             }
         }
     }
