@@ -329,7 +329,11 @@ router.get('/search', async (req, res) => {
     res.json({ users });
   } catch (error) {
     console.error('Benutzer-Suche-Fehler:', error);
-    res.status(500).json({ error: 'Suche konnte nicht durchgeführt werden' });
+    res.status(500).json({ 
+      error: 'Suche konnte nicht durchgeführt werden',
+      details: error.message,
+      type: error.code || 'UNKNOWN_ERROR'
+    });
   }
 });
 

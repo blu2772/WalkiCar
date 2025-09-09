@@ -43,6 +43,53 @@ class AuthManager: NSObject, ObservableObject {
         authorizationController.performRequests()
     }
     
+    func loginWithEmail(email: String, password: String) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response = try await apiClient.loginWithEmail(email: email, password: password)
+            await MainActor.run {
+                apiClient.setAuthToken(response.token)
+                currentUser = response.user
+                isAuthenticated = true
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+            throw error
+        }
+    }
+    
+    func registerWithEmail(email: String, username: String, displayName: String, password: String) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response = try await apiClient.registerWithEmail(
+                email: email,
+                username: username,
+                displayName: displayName,
+                password: password
+            )
+            await MainActor.run {
+                apiClient.setAuthToken(response.token)
+                currentUser = response.user
+                isAuthenticated = true
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+            throw error
+        }
+    }
+    
     func logout() {
         Task {
             do {

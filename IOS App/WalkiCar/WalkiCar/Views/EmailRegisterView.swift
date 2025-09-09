@@ -165,31 +165,17 @@ struct EmailRegisterView: View {
     }
     
     private func register() {
-        print("🚀 Registrierung gestartet für E-Mail: \(email)")
-        print("📝 Formular-Validierung: \(isFormValid)")
-        
         Task {
             do {
-                print("📡 API-Aufruf gestartet...")
-                let response = try await APIClient.shared.registerWithEmail(
+                try await authManager.registerWithEmail(
                     email: email,
                     username: username,
                     displayName: displayName,
                     password: password
                 )
-                print("✅ Registrierung erfolgreich!")
-                
-                await MainActor.run {
-                    APIClient.shared.setAuthToken(response.token)
-                    authManager.currentUser = response.user
-                    authManager.isAuthenticated = true
-                    showingSuccess = true
-                }
+                showingSuccess = true
             } catch {
-                print("❌ Registrierung fehlgeschlagen: \(error.localizedDescription)")
-                await MainActor.run {
-                    authManager.errorMessage = error.localizedDescription
-                }
+                // Error wird bereits vom AuthManager gesetzt
             }
         }
     }

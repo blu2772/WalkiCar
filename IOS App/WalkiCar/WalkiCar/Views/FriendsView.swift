@@ -27,10 +27,29 @@ struct FriendsView: View {
                         
                         Spacer()
                         
-                        Button(action: { showingAddFriend = true }) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white)
+                        HStack(spacing: 15) {
+                            // Friend requests button
+                            Button(action: { showingFriendRequests = true }) {
+                                ZStack {
+                                    Image(systemName: "person.crop.circle.badge.questionmark")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                    
+                                    if !friendsManager.friendRequests.isEmpty {
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: 8, height: 8)
+                                            .offset(x: 8, y: -8)
+                                    }
+                                }
+                            }
+                            
+                            // Add friend button
+                            Button(action: { showingAddFriend = true }) {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.white)
+                            }
                         }
                     }
                     .padding(.horizontal, 20)

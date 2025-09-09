@@ -29,6 +29,39 @@ struct User: Codable, Identifiable {
         case lastSeen = "last_seen"
         case createdAt = "created_at"
     }
+    
+    // Custom initializer für flexible email_verified Typen
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        username = try container.decode(String.self, forKey: .username)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        email = try container.decode(String.self, forKey: .email)
+        
+        // Flexible email_verified Dekodierung (0/1 oder true/false)
+        if let boolValue = try? container.decode(Bool.self, forKey: .emailVerified) {
+            emailVerified = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .emailVerified) {
+            emailVerified = intValue != 0
+        } else {
+            emailVerified = false // Fallback
+        }
+        
+        profilePictureUrl = try container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
+        
+        // Flexible is_online Dekodierung
+        if let boolValue = try? container.decode(Bool.self, forKey: .isOnline) {
+            isOnline = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .isOnline) {
+            isOnline = intValue != 0
+        } else {
+            isOnline = nil
+        }
+        
+        lastSeen = try container.decodeIfPresent(String.self, forKey: .lastSeen)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+    }
 }
 
 struct AuthResponse: Codable {

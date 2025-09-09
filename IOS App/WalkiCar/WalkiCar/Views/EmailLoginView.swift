@@ -124,17 +124,10 @@ struct EmailLoginView: View {
     private func login() {
         Task {
             do {
-                let response = try await APIClient.shared.loginWithEmail(email: email, password: password)
-                await MainActor.run {
-                    APIClient.shared.setAuthToken(response.token)
-                    authManager.currentUser = response.user
-                    authManager.isAuthenticated = true
-                    dismiss()
-                }
+                try await authManager.loginWithEmail(email: email, password: password)
+                dismiss()
             } catch {
-                await MainActor.run {
-                    authManager.errorMessage = error.localizedDescription
-                }
+                // Error wird bereits vom AuthManager gesetzt
             }
         }
     }
