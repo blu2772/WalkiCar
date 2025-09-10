@@ -12,9 +12,9 @@ struct Location: Codable, Identifiable {
     let speed: Float?
     let heading: Float?
     let altitude: Float?
-    let isLive: Bool
-    let isParked: Bool
-    let bluetoothConnected: Bool
+    let isLive: Bool?
+    let isParked: Bool?
+    let bluetoothConnected: Bool?
     let timestamp: String
     
     // User info (from JOIN queries)

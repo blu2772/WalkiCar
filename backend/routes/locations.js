@@ -51,12 +51,12 @@ router.post('/update', authenticateToken, async (req, res) => {
             }
         }
 
-        // Aktuellen Standort in locations Tabelle speichern
+        // Aktuellen Standort in locations Tabelle speichern (nur bestehende Spalten)
         const locationResult = await query(
             `INSERT INTO locations 
-             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude, bluetooth_connected, is_live, is_parked) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude, bluetooth_connected || false, true, false]
+             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude]
         );
 
         // Standort in Historie speichern
@@ -102,7 +102,7 @@ router.get('/live', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Hole alle Live-Standorte von Freunden (temporär ohne neue Spalten)
+        // Hole alle Live-Standorte von Freunden (nur bestehende Spalten)
         const liveLocations = await query(`
             SELECT DISTINCT
                 l.id,

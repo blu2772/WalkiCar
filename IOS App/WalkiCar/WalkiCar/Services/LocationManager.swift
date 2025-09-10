@@ -214,9 +214,9 @@ class LocationManager: NSObject, ObservableObject {
     // MARK: - Helper Methods
     
     func getLocationStatus(for location: Location) -> LocationStatus {
-        if location.isLive && location.bluetoothConnected {
+        if let isLive = location.isLive, let bluetoothConnected = location.bluetoothConnected, isLive && bluetoothConnected {
             return .live
-        } else if location.isParked {
+        } else if let isParked = location.isParked, isParked {
             return .parked
         } else {
             return .offline
