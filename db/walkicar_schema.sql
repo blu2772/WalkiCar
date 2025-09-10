@@ -92,8 +92,53 @@ CREATE TABLE IF NOT EXISTS group_members (
     INDEX idx_user_groups (user_id)
 );
 
--- Standorte Tabelle
+-- Standorte Tabelle (Live-Tracking)
 CREATE TABLE IF NOT EXISTS locations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    car_id INT,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy FLOAT,
+    speed FLOAT,
+    heading FLOAT,
+    altitude FLOAT,
+    is_live BOOLEAN DEFAULT TRUE,
+    is_parked BOOLEAN DEFAULT FALSE,
+    bluetooth_connected BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE SET NULL,
+    INDEX idx_user_locations (user_id, timestamp),
+    INDEX idx_car_locations (car_id, timestamp),
+    INDEX idx_location_coords (latitude, longitude),
+    INDEX idx_location_time (timestamp),
+    INDEX idx_live_locations (is_live, timestamp),
+    INDEX idx_parked_locations (is_parked, timestamp)
+);
+
+-- Geparkte Standorte Tabelle (letzter bekannter Standort)
+CREATE TABLE IF NOT EXISTS parked_locations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    car_id INT NOT NULL,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy FLOAT,
+    parked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_live_update TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_car_parked (user_id, car_id),
+    INDEX idx_user_parked (user_id),
+    INDEX idx_car_parked (car_id),
+    INDEX idx_parked_coords (latitude, longitude)
+);
+
+-- Standort-Historie für Routen-Tracking
+CREATE TABLE IF NOT EXISTS location_history (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     car_id INT,
@@ -107,10 +152,9 @@ CREATE TABLE IF NOT EXISTS locations (
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE SET NULL,
-    INDEX idx_user_locations (user_id, timestamp),
-    INDEX idx_car_locations (car_id, timestamp),
-    INDEX idx_location_coords (latitude, longitude),
-    INDEX idx_location_time (timestamp)
+    INDEX idx_user_history (user_id, timestamp),
+    INDEX idx_car_history (car_id, timestamp),
+    INDEX idx_history_time (timestamp)
 );
 
 -- Standortfreigabe Einstellungen

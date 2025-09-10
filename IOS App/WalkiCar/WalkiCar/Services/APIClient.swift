@@ -262,6 +262,72 @@ class APIClient: ObservableObject {
         )
     }
     
+    // MARK: - Location API Methods
+    
+    func updateLocation(_ request: LocationUpdateRequest) async throws -> LocationUpdateResponse {
+        print("🌐 APIClient: Aktualisiere Standort")
+        return try await makeRequest(
+            endpoint: "/locations/update",
+            method: "POST",
+            body: request,
+            responseType: LocationUpdateResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func getLiveLocations() async throws -> LiveLocationsResponse {
+        print("🌐 APIClient: Lade Live-Standorte")
+        return try await makeRequest(
+            endpoint: "/locations/live",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: LiveLocationsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func parkCar(_ request: ParkCarRequest) async throws {
+        print("🌐 APIClient: Parke Fahrzeug ID: \(request.carId)")
+        _ = try await makeRequestDict(
+            endpoint: "/locations/park",
+            method: "POST",
+            body: request,
+            requiresAuth: true
+        )
+    }
+    
+    func getLocationHistory(carId: Int, days: Int = 7) async throws -> LocationHistoryResponse {
+        print("🌐 APIClient: Lade Standort-Historie für Fahrzeug ID: \(carId)")
+        return try await makeRequest(
+            endpoint: "/locations/history/\(carId)?days=\(days)",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: LocationHistoryResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func updateLocationSettings(_ request: LocationSettingsRequest) async throws {
+        print("🌐 APIClient: Aktualisiere Standort-Einstellungen")
+        _ = try await makeRequestDict(
+            endpoint: "/locations/settings",
+            method: "PUT",
+            body: request,
+            requiresAuth: true
+        )
+    }
+    
+    func getLocationSettings() async throws -> LocationSettingsResponse {
+        print("🌐 APIClient: Lade Standort-Einstellungen")
+        return try await makeRequest(
+            endpoint: "/locations/settings",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: LocationSettingsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
     // MARK: - Token Management
     
     func setAuthToken(_ token: String) {

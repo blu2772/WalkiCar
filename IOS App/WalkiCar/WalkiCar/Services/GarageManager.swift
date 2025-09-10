@@ -131,24 +131,75 @@ class GarageManager: NSObject, ObservableObject {
                 await MainActor.run {
                     // Aktualisiere lokale Daten
                     for i in 0..<self.cars.count {
-                        self.cars[i] = Car(
-                            id: self.cars[i].id,
-                            name: self.cars[i].name,
-                            brand: self.cars[i].brand,
-                            model: self.cars[i].model,
-                            year: self.cars[i].year,
-                            color: self.cars[i].color,
-                            bluetoothIdentifier: self.cars[i].bluetoothIdentifier,
-                            isActive: self.cars[i].id == carId,
-                            createdAt: self.cars[i].createdAt,
-                            updatedAt: self.cars[i].updatedAt
-                        )
+                        if self.cars[i].id == carId {
+                            // Erstelle neues Car-Objekt mit aktualisiertem isActive Status
+                            let updatedCar = Car(
+                                id: self.cars[i].id,
+                                name: self.cars[i].name,
+                                brand: self.cars[i].brand,
+                                model: self.cars[i].model,
+                                year: self.cars[i].year,
+                                color: self.cars[i].color,
+                                bluetoothIdentifier: self.cars[i].bluetoothIdentifier,
+                                isActive: true,
+                                createdAt: self.cars[i].createdAt,
+                                updatedAt: self.cars[i].updatedAt
+                            )
+                            self.cars[i] = updatedCar
+                        } else {
+                            // Setze alle anderen auf inaktiv
+                            let updatedCar = Car(
+                                id: self.cars[i].id,
+                                name: self.cars[i].name,
+                                brand: self.cars[i].brand,
+                                model: self.cars[i].model,
+                                year: self.cars[i].year,
+                                color: self.cars[i].color,
+                                bluetoothIdentifier: self.cars[i].bluetoothIdentifier,
+                                isActive: false,
+                                createdAt: self.cars[i].createdAt,
+                                updatedAt: self.cars[i].updatedAt
+                            )
+                            self.cars[i] = updatedCar
+                        }
                     }
                 }
             } catch {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription
                 }
+            }
+        }
+    }
+    
+    // MARK: - Location Integration
+    
+    func connectBluetoothAndStartTracking(carId: Int) {
+        // Simuliere Bluetooth-Verbindung und starte Standort-Tracking
+        Task { @MainActor in
+            // Starte Standort-Tracking für das spezifische Auto
+            LocationManager.shared.startLocationTracking()
+            
+            // Aktualisiere Standort alle 5 Sekunden für dieses Auto
+            Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+                LocationManager.shared.updateLocationToServer(carId: carId, bluetoothConnected: true)
+            }
+            
+            print("🚗 GarageManager: Bluetooth-Verbindung und Standort-Tracking für Auto \(carId) gestartet")
+        }
+    }
+    
+    func disconnectBluetoothAndParkCar(carId: Int) {
+        Task { @MainActor in
+            // Stoppe Standort-Tracking und markiere Auto als geparkt
+            LocationManager.shared.stopLocationTracking()
+            
+            // Markiere Auto als geparkt
+            do {
+                try await apiClient.parkCar(ParkCarRequest(carId: carId))
+                print("🅿️ GarageManager: Auto \(carId) als geparkt markiert")
+            } catch {
+                print("❌ GarageManager: Fehler beim Parken des Autos: \(error)")
             }
         }
     }
@@ -182,19 +233,25 @@ class GarageManager: NSObject, ObservableObject {
 // MARK: - CBCentralManagerDelegate
 
 extension GarageManager: CBCentralManagerDelegate {
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+    nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:
             print("🔵 Bluetooth ist eingeschaltet")
         case .poweredOff:
             print("🔴 Bluetooth ist ausgeschaltet")
-            errorMessage = "Bluetooth ist ausgeschaltet"
+            Task { @MainActor in
+                self.errorMessage = "Bluetooth ist ausgeschaltet"
+            }
         case .unauthorized:
             print("🔴 Bluetooth-Berechtigung verweigert")
-            errorMessage = "Bluetooth-Berechtigung erforderlich"
+            Task { @MainActor in
+                self.errorMessage = "Bluetooth-Berechtigung erforderlich"
+            }
         case .unsupported:
             print("🔴 Bluetooth nicht unterstützt")
-            errorMessage = "Bluetooth wird nicht unterstützt"
+            Task { @MainActor in
+                self.errorMessage = "Bluetooth wird nicht unterstützt"
+            }
         case .resetting:
             print("🟡 Bluetooth wird zurückgesetzt")
         case .unknown:
@@ -204,21 +261,23 @@ extension GarageManager: CBCentralManagerDelegate {
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
+    nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let deviceName = peripheral.name ?? "Unbekanntes Gerät"
         let deviceId = peripheral.identifier.uuidString
         
         // Prüfe ob das Gerät bereits in der Liste ist
-        if !bluetoothDevices.contains(where: { $0.id == deviceId }) {
-            let device = BluetoothDevice(
-                id: deviceId,
-                name: deviceName,
-                isConnected: peripheral.state == .connected,
-                signalStrength: RSSI.intValue
-            )
-            
-            bluetoothDevices.append(device)
-            print("🔵 Bluetooth-Gerät gefunden: \(deviceName) (RSSI: \(RSSI))")
+        Task { @MainActor in
+            if !self.bluetoothDevices.contains(where: { $0.id == deviceId }) {
+                let device = BluetoothDevice(
+                    id: deviceId,
+                    name: deviceName,
+                    isConnected: peripheral.state == .connected,
+                    signalStrength: RSSI.intValue
+                )
+                
+                self.bluetoothDevices.append(device)
+                print("🔵 Bluetooth-Gerät gefunden: \(deviceName) (RSSI: \(RSSI))")
+            }
         }
     }
 }

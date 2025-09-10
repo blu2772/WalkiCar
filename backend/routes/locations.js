@@ -1,9 +1,229 @@
 const express = require('express');
 const router = express.Router();
+const { query, transaction } = require('../config/database');
+const auth = require('../middleware/auth');
+const Joi = require('joi');
 
-// Platzhalter für Standort-Routen
-router.post('/update', (req, res) => {
-  res.json({ message: 'Standort-Routen werden implementiert' });
+// Joi Validation Schemas
+const locationUpdateSchema = Joi.object({
+    latitude: Joi.number().min(-90).max(90).required(),
+    longitude: Joi.number().min(-180).max(180).required(),
+    accuracy: Joi.number().min(0).optional(),
+    speed: Joi.number().min(0).optional(),
+    heading: Joi.number().min(0).max(360).optional(),
+    altitude: Joi.number().optional(),
+    car_id: Joi.number().integer().positive().optional(),
+    bluetooth_connected: Joi.boolean().optional()
+});
+
+const locationSettingsSchema = Joi.object({
+    visibility: Joi.string().valid('private', 'friends', 'public').required(),
+    share_location: Joi.boolean().required(),
+    share_when_moving: Joi.boolean().required(),
+    share_when_stationary: Joi.boolean().required(),
+    car_id: Joi.number().integer().positive().optional()
+});
+
+// POST /locations/update - Live-Standort aktualisieren
+router.post('/update', auth, async (req, res) => {
+    try {
+        const { error, value } = locationUpdateSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({
+                error: 'Ungültige Standortdaten',
+                details: error.details[0].message
+            });
+        }
+
+        const { latitude, longitude, accuracy, speed, heading, altitude, car_id, bluetooth_connected } = value;
+        const userId = req.user.id;
+
+        // Prüfe ob Auto dem Benutzer gehört
+        if (car_id) {
+            const carCheck = await query(
+                'SELECT id FROM cars WHERE id = ? AND user_id = ?',
+                [car_id, userId]
+            );
+            if (carCheck.length === 0) {
+                return res.status(404).json({
+                    error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
+                });
+            }
+        }
+
+        // Aktuellen Standort in locations Tabelle speichern
+        const locationResult = await query(
+            `INSERT INTO locations 
+             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude, bluetooth_connected, is_live, is_parked) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude, bluetooth_connected || false, true, false]
+        );
+
+        // Standort in Historie speichern
+        await query(
+            `INSERT INTO location_history 
+             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude]
+        );
+
+        // Wenn Bluetooth verbunden, geparkten Standort aktualisieren
+        if (bluetooth_connected && car_id) {
+            await query(
+                `INSERT INTO parked_locations 
+                 (user_id, car_id, latitude, longitude, accuracy, last_live_update) 
+                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                 ON DUPLICATE KEY UPDATE 
+                 latitude = VALUES(latitude),
+                 longitude = VALUES(longitude),
+                 accuracy = VALUES(accuracy),
+                 last_live_update = CURRENT_TIMESTAMP`,
+                [userId, car_id, latitude, longitude, accuracy]
+            );
+        }
+
+        res.json({
+            message: 'Standort erfolgreich aktualisiert',
+            location_id: locationResult.insertId,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Standort-Update-Fehler:', error);
+        res.status(500).json({
+            error: 'Standort konnte nicht aktualisiert werden',
+            details: error.message
+        });
+    }
+});
+
+// GET /locations/live - Live-Standorte aller Freunde abrufen
+router.get('/live', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Hole alle Live-Standorte von Freunden
+        const liveLocations = await query(`
+            SELECT DISTINCT
+                l.id,
+                l.user_id,
+                l.car_id,
+                l.latitude,
+                l.longitude,
+                l.accuracy,
+                l.speed,
+                l.heading,
+                l.altitude,
+                l.is_live,
+                l.is_parked,
+                l.bluetooth_connected,
+                l.timestamp,
+                u.username,
+                u.display_name,
+                u.profile_picture_url,
+                c.name as car_name,
+                c.brand,
+                c.model,
+                c.color
+            FROM locations l
+            JOIN users u ON l.user_id = u.id
+            LEFT JOIN cars c ON l.car_id = c.id
+            JOIN friendships f ON (
+                (f.user_id = ? AND f.friend_id = l.user_id) OR 
+                (f.friend_id = ? AND f.user_id = l.user_id)
+            )
+            WHERE f.status = 'accepted'
+            AND l.is_live = true
+            AND l.timestamp > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            ORDER BY l.timestamp DESC
+        `, [userId, userId]);
+
+        // Hole auch geparkte Standorte von Freunden
+        const parkedLocations = await query(`
+            SELECT DISTINCT
+                p.id,
+                p.user_id,
+                p.car_id,
+                p.latitude,
+                p.longitude,
+                p.accuracy,
+                p.parked_at,
+                p.last_live_update,
+                u.username,
+                u.display_name,
+                u.profile_picture_url,
+                c.name as car_name,
+                c.brand,
+                c.model,
+                c.color
+            FROM parked_locations p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN cars c ON p.car_id = c.id
+            JOIN friendships f ON (
+                (f.user_id = ? AND f.friend_id = p.user_id) OR 
+                (f.friend_id = ? AND f.user_id = p.user_id)
+            )
+            WHERE f.status = 'accepted'
+            AND p.last_live_update > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+            ORDER BY p.last_live_update DESC
+        `, [userId, userId]);
+
+        res.json({
+            live_locations: liveLocations,
+            parked_locations: parkedLocations,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Live-Standorte-Fehler:', error);
+        res.status(500).json({
+            error: 'Live-Standorte konnten nicht abgerufen werden',
+            details: error.message
+        });
+    }
+});
+
+// POST /locations/park - Fahrzeug als geparkt markieren
+router.post('/park', auth, async (req, res) => {
+    try {
+        const { car_id } = req.body;
+        const userId = req.user.id;
+
+        if (!car_id) {
+            return res.status(400).json({
+                error: 'Fahrzeug-ID ist erforderlich'
+            });
+        }
+
+        // Prüfe ob Auto dem Benutzer gehört
+        const carCheck = await query(
+            'SELECT id FROM cars WHERE id = ? AND user_id = ?',
+            [car_id, userId]
+        );
+        if (carCheck.length === 0) {
+            return res.status(404).json({
+                error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
+            });
+        }
+
+        // Aktuellen Standort als geparkt markieren
+        await query(
+            'UPDATE locations SET is_live = false, is_parked = true, bluetooth_connected = false WHERE user_id = ? AND car_id = ? AND is_live = true',
+            [userId, car_id]
+        );
+
+        res.json({
+            message: 'Fahrzeug erfolgreich als geparkt markiert',
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Parken-Fehler:', error);
+        res.status(500).json({
+            error: 'Fahrzeug konnte nicht als geparkt markiert werden',
+            details: error.message
+        });
+    }
 });
 
 module.exports = router;

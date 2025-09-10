@@ -20,8 +20,7 @@ struct AddCarView: View {
     @State private var showingBluetoothScan = false
     
     private let colors = ["Schwarz", "Weiß", "Grau", "Rot", "Blau", "Grün", "Gelb", "Silber"]
-    private let currentYear = Calendar.current.component(.year, from: Date())
-    private let years = Array(1900...currentYear).reversed()
+    private let years = Array(1900...Calendar.current.component(.year, from: Date())).reversed()
     
     var body: some View {
         NavigationView {

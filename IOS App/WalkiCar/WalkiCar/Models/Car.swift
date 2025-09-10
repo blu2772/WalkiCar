@@ -32,6 +32,20 @@ struct Car: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
     
+    // Manual initializer
+    init(id: Int, name: String, brand: String?, model: String?, year: Int?, color: String?, bluetoothIdentifier: String?, isActive: Bool, createdAt: String?, updatedAt: String?) {
+        self.id = id
+        self.name = name
+        self.brand = brand
+        self.model = model
+        self.year = year
+        self.color = color
+        self.bluetoothIdentifier = bluetoothIdentifier
+        self.isActive = isActive
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
     // Custom initializer für flexible is_active Dekodierung
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

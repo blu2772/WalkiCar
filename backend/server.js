@@ -156,6 +156,83 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
+  
+  // Location tracking events
+  socket.on('start_location_tracking', async (data) => {
+    try {
+      const { userId, carId } = data;
+      console.log(`User ${userId} started location tracking for car ${carId}`);
+      
+      // Join location tracking room
+      socket.join(`location_tracking_${userId}`);
+      
+      // Broadcast to friends that user is now live
+      socket.to(`friends_of_${userId}`).emit('friend_went_live', {
+        userId,
+        carId,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error starting location tracking:', error);
+      socket.emit('location_tracking_error', { error: error.message });
+    }
+  });
+  
+  socket.on('stop_location_tracking', async (data) => {
+    try {
+      const { userId, carId } = data;
+      console.log(`User ${userId} stopped location tracking for car ${carId}`);
+      
+      // Leave location tracking room
+      socket.leave(`location_tracking_${userId}`);
+      
+      // Broadcast to friends that user parked
+      socket.to(`friends_of_${userId}`).emit('friend_parked', {
+        userId,
+        carId,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error stopping location tracking:', error);
+      socket.emit('location_tracking_error', { error: error.message });
+    }
+  });
+  
+  socket.on('location_update', async (data) => {
+    try {
+      const { userId, carId, latitude, longitude, accuracy, speed, heading, altitude, bluetoothConnected } = data;
+      
+      // Broadcast location update to friends
+      socket.to(`friends_of_${userId}`).emit('friend_location_update', {
+        userId,
+        carId,
+        latitude,
+        longitude,
+        accuracy,
+        speed,
+        heading,
+        altitude,
+        bluetoothConnected,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`Location update from user ${userId}: ${latitude}, ${longitude}`);
+    } catch (error) {
+      console.error('Error processing location update:', error);
+    }
+  });
+  
+  socket.on('join_friends_room', async (data) => {
+    try {
+      const { userId } = data;
+      
+      // Join friends room to receive updates
+      socket.join(`friends_of_${userId}`);
+      console.log(`User ${socket.id} joined friends room for user ${userId}`);
+    } catch (error) {
+      console.error('Error joining friends room:', error);
+    }
+  });
 });
 
 // Error handling middleware
