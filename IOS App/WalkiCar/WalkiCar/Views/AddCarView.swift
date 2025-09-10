@@ -16,8 +16,7 @@ struct AddCarView: View {
     @State private var model = ""
     @State private var year = ""
     @State private var color = ""
-    @State private var selectedBluetoothDevice: BluetoothDevice?
-    @State private var showingBluetoothScan = false
+    @State private var showingAutomationSetup = false
     
     private let colors = ["Schwarz", "Weiß", "Grau", "Rot", "Blau", "Grün", "Gelb", "Silber"]
     private let years = Array(1900...Calendar.current.component(.year, from: Date())).reversed()
@@ -98,30 +97,58 @@ struct AddCarView: View {
                                 }
                             }
                             
-                            // Bluetooth Device
+                            // Bluetooth Automatisierung
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Bluetooth-Gerät")
+                                Text("Bluetooth-Automatisierung")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                                 
-                                Button(action: { showingBluetoothScan = true }) {
+                                VStack(spacing: 12) {
+                                    // Automatisierung einrichten Button
+                                    Button(action: setupAutomation) {
+                                        HStack {
+                                            Image(systemName: "gear.badge")
+                                                .foregroundColor(.blue)
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Automatisierung einrichten")
+                                                    .foregroundColor(.white)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                
+                                                Text("Automatisches Tracking bei Bluetooth-Verbindung")
+                                                    .foregroundColor(.gray)
+                                                    .font(.system(size: 12))
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                                .font(.system(size: 12))
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(Color.gray.opacity(0.2))
+                                        .cornerRadius(10)
+                                    }
+                                    
+                                    // Info Text
                                     HStack {
-                                        Image(systemName: "bluetooth")
+                                        Image(systemName: "info.circle")
                                             .foregroundColor(.blue)
+                                            .font(.system(size: 12))
                                         
-                                        Text(selectedBluetoothDevice?.name ?? "Bluetooth-Gerät auswählen")
-                                            .foregroundColor(selectedBluetoothDevice != nil ? .white : .gray)
+                                        Text("Nach dem Speichern des Autos kannst du die Automatisierung in der Shortcuts-App einrichten")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: 11))
+                                            .multilineTextAlignment(.leading)
                                         
                                         Spacer()
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.gray)
-                                            .font(.system(size: 12))
                                     }
                                     .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Color.gray.opacity(0.2))
-                                    .cornerRadius(10)
+                                    .padding(.vertical, 8)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(8)
                                 }
                             }
                         }
@@ -165,14 +192,18 @@ struct AddCarView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingBluetoothScan) {
-            BluetoothScanView(garageManager: garageManager, selectedDevice: $selectedBluetoothDevice)
+        .sheet(isPresented: $showingAutomationSetup) {
+            AutomationSetupView(carName: name)
         }
         .preferredColorScheme(.dark)
     }
     
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private func setupAutomation() {
+        showingAutomationSetup = true
     }
     
     private func createCar() {
@@ -183,7 +214,7 @@ struct AddCarView: View {
             model: model.isEmpty ? nil : model.trimmingCharacters(in: .whitespacesAndNewlines),
             year: yearInt,
             color: color.isEmpty ? nil : color.trimmingCharacters(in: .whitespacesAndNewlines),
-            bluetoothIdentifier: selectedBluetoothDevice?.id
+            bluetoothIdentifier: nil // Wird später über Automatisierung gesetzt
         )
         
         dismiss()

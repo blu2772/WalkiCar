@@ -23,12 +23,15 @@ class LocationManager: NSObject, ObservableObject {
     private var lastUpdateTime: Date?
     private let updateInterval: TimeInterval = 5.0 // 5 Sekunden
     private var currentUserId: Int?
+    private var activeCarId: Int?
+    private var isAppInForeground = true
     
     // MARK: - Initialization
     override init() {
         super.init()
         setupLocationManager()
         setupWebSocketNotifications()
+        setupAppLifecycleNotifications()
     }
     
     private func setupLocationManager() {
@@ -37,6 +40,39 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.distanceFilter = 10 // Mindestens 10 Meter Bewegung
         authorizationStatus = locationManager.authorizationStatus
         isLocationEnabled = authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+    }
+    
+    private func setupAppLifecycleNotifications() {
+        // App-Lifecycle-Überwachung für automatisches Standort-Tracking
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+        
+        print("📍 LocationManager: App-Lifecycle-Überwachung gestartet")
     }
     
     private func setupWebSocketNotifications() {
@@ -103,11 +139,56 @@ class LocationManager: NSObject, ObservableObject {
         print("📍 LocationManager: Standort-Tracking gestoppt")
     }
     
+    func setActiveCar(carId: Int?) {
+        activeCarId = carId
+        print("📍 LocationManager: Aktives Auto gesetzt - ID: \(carId ?? -1)")
+        
+        // Starte automatisch Standort-Tracking wenn Auto gesetzt wird
+        if carId != nil {
+            checkAndStartAutomaticTracking()
+        }
+    }
+    
+    // MARK: - App Lifecycle Handlers
+    
+    @objc private func appDidBecomeActive() {
+        isAppInForeground = true
+        print("📍 LocationManager: App wurde aktiv - prüfe automatisches Tracking")
+        checkAndStartAutomaticTracking()
+    }
+    
+    @objc private func appWillResignActive() {
+        print("📍 LocationManager: App wird inaktiv")
+    }
+    
+    @objc private func appDidEnterBackground() {
+        isAppInForeground = false
+        print("📍 LocationManager: App im Hintergrund - Tracking läuft weiter")
+    }
+    
+    @objc private func appWillEnterForeground() {
+        isAppInForeground = true
+        print("📍 LocationManager: App kommt in Vordergrund - prüfe Tracking")
+        checkAndStartAutomaticTracking()
+    }
+    
+    // MARK: - Automatic Tracking
+    
+    private func checkAndStartAutomaticTracking() {
+        // Delegiere an AppStateManager für komplexe Logik
+        Task { @MainActor in
+            AppStateManager.shared.checkAndStartAutomaticTracking()
+        }
+    }
+    
     func updateLocationToServer(carId: Int?, bluetoothConnected: Bool = false) {
         guard let location = currentLocation else {
             print("📍 LocationManager: Kein aktueller Standort verfügbar")
             return
         }
+        
+        // Verwende das aktive Auto, falls keine carId übergeben wurde
+        let carIdToUse = carId ?? activeCarId
         
         let request = LocationUpdateRequest(
             latitude: location.coordinate.latitude,
@@ -116,7 +197,7 @@ class LocationManager: NSObject, ObservableObject {
             speed: location.speed >= 0 ? Float(location.speed) : nil,
             heading: location.course >= 0 ? Float(location.course) : nil,
             altitude: Float(location.altitude),
-            carId: carId,
+            carId: carIdToUse,
             bluetoothConnected: bluetoothConnected
         )
         
@@ -196,7 +277,7 @@ class LocationManager: NSObject, ObservableObject {
     }
     
     private func performPeriodicUpdate() {
-        guard isTracking, let location = currentLocation else { return }
+        guard isTracking, let _ = currentLocation else { return }
         
         // Prüfe ob genug Zeit vergangen ist seit dem letzten Update
         if let lastUpdate = lastUpdateTime,

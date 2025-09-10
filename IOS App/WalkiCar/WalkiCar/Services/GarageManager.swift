@@ -18,6 +18,7 @@ class GarageManager: NSObject, ObservableObject {
     
     private let apiClient = APIClient.shared
     private var centralManager: CBCentralManager?
+    private var bluetoothMonitoringTimer: Timer?
     
     // Service-UUIDs für Auto-Bluetooth-Geräte (erweiterte Liste)
     private let carServiceUUIDs: [CBUUID] = [
@@ -48,6 +49,12 @@ class GarageManager: NSObject, ObservableObject {
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
+        startBluetoothMonitoring()
+        
+        // Prüfe sofort beim Start, ob bereits ein Auto verbunden ist
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.checkBluetoothConnections()
+        }
     }
     
     func loadGarage() {
@@ -60,6 +67,14 @@ class GarageManager: NSObject, ObservableObject {
                 await MainActor.run {
                     self.cars = response.cars
                     self.isLoading = false
+                    
+                    // Prüfe nach dem Laden der Autos, ob bereits ein Auto verbunden ist
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.checkBluetoothConnections()
+                    }
+                    
+                    // Benachrichtige AppStateManager über geladene Garage
+                    AppStateManager.shared.checkAndStartAutomaticTracking()
                 }
             } catch {
                 await MainActor.run {
@@ -168,6 +183,12 @@ class GarageManager: NSObject, ObservableObject {
                                 updatedAt: self.cars[i].updatedAt
                             )
                             self.cars[i] = updatedCar
+                            
+                            // Benachrichtige LocationManager über das aktive Auto
+                            LocationManager.shared.setActiveCar(carId: carId)
+                            
+                            // Benachrichtige AppStateManager über Auto-Aktivierung
+                            AppStateManager.shared.onCarActivated(carId: carId)
                         } else {
                             // Setze alle anderen auf inaktiv
                             let updatedCar = Car(
@@ -344,6 +365,86 @@ class GarageManager: NSObject, ObservableObject {
     func stopBluetoothScan() {
         centralManager?.stopScan()
         isScanning = false
+    }
+    
+    // MARK: - Bluetooth Monitoring
+    
+    func startBluetoothMonitoring() {
+        // Überwache Bluetooth-Verbindungen alle 10 Sekunden
+        bluetoothMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            self.checkBluetoothConnections()
+        }
+        print("🔵 GarageManager: Bluetooth-Überwachung gestartet")
+    }
+    
+    func stopBluetoothMonitoring() {
+        bluetoothMonitoringTimer?.invalidate()
+        bluetoothMonitoringTimer = nil
+        print("🔵 GarageManager: Bluetooth-Überwachung gestoppt")
+    }
+    
+    func getConnectedPeripherals() -> [CBPeripheral] {
+        guard let centralManager = centralManager, centralManager.state == .poweredOn else {
+            return []
+        }
+        return centralManager.retrieveConnectedPeripherals(withServices: carServiceUUIDs)
+    }
+    
+    private func checkBluetoothConnections() {
+        guard let centralManager = centralManager, centralManager.state == .poweredOn else {
+            print("🔵 GarageManager: Bluetooth nicht verfügbar oder ausgeschaltet")
+            return
+        }
+        
+        // Hole alle verbundenen Geräte
+        let connectedPeripherals = centralManager.retrieveConnectedPeripherals(withServices: carServiceUUIDs)
+        print("🔵 GarageManager: Prüfe Bluetooth-Verbindungen - \(connectedPeripherals.count) Geräte verbunden")
+        
+        // Prüfe ob eines der verbundenen Geräte einem Auto zugeordnet ist
+        for peripheral in connectedPeripherals {
+            let deviceId = peripheral.identifier.uuidString
+            let deviceName = peripheral.name ?? "Unbekanntes Gerät"
+            print("🔵 GarageManager: Verbundenes Gerät: \(deviceName) (ID: \(deviceId.prefix(8))...)")
+            
+            // Suche nach einem Auto mit dieser Bluetooth-ID
+            if let car = cars.first(where: { $0.bluetoothIdentifier == deviceId }) {
+                print("🚗 GarageManager: Auto gefunden: \(car.name) (ID: \(car.id))")
+                
+                // Auto gefunden! Prüfe ob es bereits aktiv ist
+                if !car.isActive {
+                    print("🚗 GarageManager: Bluetooth-Verbindung erkannt für Auto: \(car.name)")
+                    print("🚗 GarageManager: Aktiviere Auto automatisch...")
+                    
+                    // Aktiviere das Auto automatisch
+                    setActiveCar(carId: car.id)
+                    
+                    // Starte Standort-Tracking für dieses Auto
+                    connectBluetoothAndStartTracking(carId: car.id)
+                    
+                    // Benachrichtige AppStateManager über Bluetooth-Verbindung
+                    AppStateManager.shared.onBluetoothConnectionChanged()
+                } else {
+                    print("🚗 GarageManager: Auto \(car.name) ist bereits aktiv")
+                }
+            } else {
+                print("🔵 GarageManager: Kein Auto mit Bluetooth-ID \(deviceId.prefix(8))... gefunden")
+            }
+        }
+        
+        // Prüfe auch, ob aktives Auto noch verbunden ist
+        if let activeCar = activeCar, let bluetoothId = activeCar.bluetoothIdentifier {
+            let isStillConnected = connectedPeripherals.contains { peripheral in
+                peripheral.identifier.uuidString == bluetoothId
+            }
+            
+            if !isStillConnected {
+                print("🚗 GarageManager: Bluetooth-Verbindung zu aktivem Auto verloren: \(activeCar.name)")
+                print("🚗 GarageManager: Stoppe Standort-Tracking...")
+                
+                // Stoppe Standort-Tracking
+                disconnectBluetoothAndParkCar(carId: activeCar.id)
+            }
+        }
     }
 }
 
