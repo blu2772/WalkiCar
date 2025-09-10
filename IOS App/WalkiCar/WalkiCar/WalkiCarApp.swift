@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UserNotifications
 
 @main
 struct WalkiCarApp: App {
@@ -27,24 +26,6 @@ struct WalkiCarApp: App {
                         garageManager: garageManager,
                         locationManager: locationManager
                     )
-                    
-                    // Setze AutomationService Callbacks
-                    AutomationService.shared.onBluetoothConnected = { carId, deviceId in
-                        Task { @MainActor in
-                            garageManager.setActiveCar(carId: carId)
-                            locationManager.startLocationTracking()
-                        }
-                    }
-                    
-                    AutomationService.shared.onBluetoothDisconnected = { carId, deviceId in
-                        Task { @MainActor in
-                            locationManager.stopLocationTracking()
-                        }
-                    }
-                }
-                .onOpenURL { url in
-                    // Handle URL-Scheme für Apple Automatisierung
-                    _ = AutomationService.shared.handleAutomationURL(url)
                 }
         }
     }

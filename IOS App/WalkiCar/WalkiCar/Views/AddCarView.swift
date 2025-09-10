@@ -16,8 +16,8 @@ struct AddCarView: View {
     @State private var model = ""
     @State private var year = ""
     @State private var color = ""
-    @State private var showingAutomationSetup = false
-    @State private var showingTemplateShare = false
+    @State private var selectedBluetoothDevice: BluetoothDevice?
+    @State private var showingBluetoothScan = false
     
     private let colors = ["Schwarz", "Weiß", "Grau", "Rot", "Blau", "Grün", "Gelb", "Silber"]
     private let years = Array(1900...Calendar.current.component(.year, from: Date())).reversed()
@@ -98,86 +98,30 @@ struct AddCarView: View {
                                 }
                             }
                             
-                            // Bluetooth Automatisierung
+                            // Bluetooth Device
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Bluetooth-Automatisierung")
+                                Text("Bluetooth-Gerät")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                                 
-                                VStack(spacing: 12) {
-                                    // Template erstellen Button
-                                    Button(action: createTemplates) {
-                                        HStack {
-                                            Image(systemName: "square.and.arrow.up")
-                                                .foregroundColor(.green)
-                                            
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Shortcut-Templates erstellen")
-                                                    .foregroundColor(.white)
-                                                    .font(.system(size: 14, weight: .medium))
-                                                
-                                                Text("Automatische Shortcuts für Bluetooth-Events")
-                                                    .foregroundColor(.gray)
-                                                    .font(.system(size: 12))
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.gray)
-                                                .font(.system(size: 12))
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color.gray.opacity(0.2))
-                                        .cornerRadius(10)
-                                    }
-                                    
-                                    // Automatisierung einrichten Button
-                                    Button(action: setupAutomation) {
-                                        HStack {
-                                            Image(systemName: "gear.badge")
-                                                .foregroundColor(.blue)
-                                            
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Automatisierung einrichten")
-                                                    .foregroundColor(.white)
-                                                    .font(.system(size: 14, weight: .medium))
-                                                
-                                                Text("Manuelle Einrichtung in der Shortcuts-App")
-                                                    .foregroundColor(.gray)
-                                                    .font(.system(size: 12))
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.gray)
-                                                .font(.system(size: 12))
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color.gray.opacity(0.2))
-                                        .cornerRadius(10)
-                                    }
-                                    
-                                    // Info Text
+                                Button(action: { showingBluetoothScan = true }) {
                                     HStack {
-                                        Image(systemName: "info.circle")
+                                        Image(systemName: "bluetooth")
                                             .foregroundColor(.blue)
-                                            .font(.system(size: 12))
                                         
-                                        Text("Empfohlen: Erstelle zuerst die Templates, dann richte die Automatisierung ein")
-                                            .foregroundColor(.gray)
-                                            .font(.system(size: 11))
-                                            .multilineTextAlignment(.leading)
+                                        Text(selectedBluetoothDevice?.name ?? "Bluetooth-Gerät auswählen")
+                                            .foregroundColor(selectedBluetoothDevice != nil ? .white : .gray)
                                         
                                         Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: 12))
                                     }
                                     .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Color.blue.opacity(0.1))
-                                    .cornerRadius(8)
+                                    .padding(.vertical, 12)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(10)
                                 }
                             }
                         }
@@ -221,25 +165,14 @@ struct AddCarView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAutomationSetup) {
-            AutomationSetupView(carName: name)
-        }
-        .sheet(isPresented: $showingTemplateShare) {
-            TemplateShareView(carId: 0, carName: name) // CarId wird nach dem Speichern gesetzt
+        .sheet(isPresented: $showingBluetoothScan) {
+            BluetoothScanView(garageManager: garageManager, selectedDevice: $selectedBluetoothDevice)
         }
         .preferredColorScheme(.dark)
     }
     
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-    
-    private func setupAutomation() {
-        showingAutomationSetup = true
-    }
-    
-    private func createTemplates() {
-        showingTemplateShare = true
     }
     
     private func createCar() {
@@ -250,7 +183,7 @@ struct AddCarView: View {
             model: model.isEmpty ? nil : model.trimmingCharacters(in: .whitespacesAndNewlines),
             year: yearInt,
             color: color.isEmpty ? nil : color.trimmingCharacters(in: .whitespacesAndNewlines),
-            bluetoothIdentifier: nil // Wird später über Automatisierung gesetzt
+            bluetoothIdentifier: selectedBluetoothDevice?.id
         )
         
         dismiss()

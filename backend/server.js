@@ -15,7 +15,6 @@ const friendRoutes = require('./routes/friends');
 const carRoutes = require('./routes/cars');
 const groupRoutes = require('./routes/groups');
 const locationRoutes = require('./routes/locations');
-const automationRoutes = require('./routes/automation');
 
 const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
@@ -121,7 +120,6 @@ app.use('/api/friends', authenticateToken, friendRoutes);
 app.use('/api/cars', authenticateToken, carRoutes);
 app.use('/api/groups', authenticateToken, groupRoutes);
 app.use('/api/locations', authenticateToken, locationRoutes);
-app.use('/api/automation', authenticateToken, automationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

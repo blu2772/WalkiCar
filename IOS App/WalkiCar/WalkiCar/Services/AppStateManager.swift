@@ -120,4 +120,38 @@ class AppStateManager: ObservableObject {
             self.checkAndStartAutomaticTracking()
         }
     }
+    
+    // MARK: - Shortcuts Integration
+    
+    func onBluetoothConnected(deviceId: String, carId: Int) {
+        guard let garageManager = garageManager,
+              let locationManager = locationManager else {
+            print("🏠 AppStateManager: Manager noch nicht verfügbar für Bluetooth-Verbindung")
+            return
+        }
+        
+        print("🏠 AppStateManager: Bluetooth-Verbindung über Shortcut erkannt - Car ID: \(carId)")
+        
+        // Aktiviere das Auto
+        garageManager.setActiveCar(carId: carId)
+        
+        // Starte Standort-Tracking
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            locationManager.startLocationTracking()
+            print("🏠 AppStateManager: Standort-Tracking für Auto \(carId) gestartet")
+        }
+    }
+    
+    func onBluetoothDisconnected(deviceId: String, carId: Int) {
+        guard let locationManager = locationManager else {
+            print("🏠 AppStateManager: LocationManager noch nicht verfügbar für Bluetooth-Trennung")
+            return
+        }
+        
+        print("🏠 AppStateManager: Bluetooth-Trennung über Shortcut erkannt - Car ID: \(carId)")
+        
+        // Stoppe Standort-Tracking
+        locationManager.stopLocationTracking()
+        print("🏠 AppStateManager: Standort-Tracking für Auto \(carId) gestoppt")
+    }
 }
