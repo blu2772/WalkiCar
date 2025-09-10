@@ -14,6 +14,7 @@ const userRoutes = require('./routes/users');
 const friendRoutes = require('./routes/friends');
 const carRoutes = require('./routes/cars');
 const groupRoutes = require('./routes/groups');
+const locationRoutes = require('./routes/locations');
 const automationRoutes = require('./routes/automation');
 
 const { connectDB } = require('./config/database');
