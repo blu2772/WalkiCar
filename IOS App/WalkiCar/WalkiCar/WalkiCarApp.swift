@@ -44,7 +44,8 @@ struct WalkiCarApp: App {
                 }
                 .onOpenURL { url in
                     // Handle URL-Scheme für Apple Automatisierung
-                    AutomationService.shared.handleAutomationURL(url)
+                    _ = AutomationService.shared.handleAutomationURL(url)
                 }
         }
+    }
 }

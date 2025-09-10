@@ -330,6 +330,34 @@ class APIClient: ObservableObject {
         )
     }
     
+    // MARK: - Automation API
+    
+    func notifyBluetoothEvent(action: String, carId: Int, deviceId: String?) async throws {
+        print("🔗 APIClient: Bluetooth Event - Action: \(action), CarID: \(carId)")
+        let request = [
+            "action": action,
+            "carId": String(carId),
+            "deviceId": deviceId ?? "",
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        _ = try await makeRequestDict(
+            endpoint: "/automation/bluetooth-event",
+            method: "POST",
+            body: request,
+            requiresAuth: true
+        )
+    }
+    
+    func getAutomationTemplate(carId: Int) async throws -> [String: Any] {
+        print("🔗 APIClient: Lade Automation Template für CarID: \(carId)")
+        return try await makeRequestDict(
+            endpoint: "/automation/car/\(carId)/template",
+            method: "GET",
+            requiresAuth: true
+        )
+    }
+    
     // MARK: - Token Management
     
     func setAuthToken(_ token: String) {

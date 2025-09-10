@@ -163,4 +163,73 @@ router.get('/car/:carId/template', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /automation/car/:carId/shortcut/:type
+// Gibt .shortcut Datei für Download zurück
+router.get('/car/:carId/shortcut/:type', authenticateToken, async (req, res) => {
+    try {
+        const carId = req.params.carId;
+        const type = req.params.type; // 'connected' oder 'disconnected'
+        
+        // Prüfe ob das Auto dem Benutzer gehört
+        const [carRows] = await db.execute(
+            'SELECT id, name FROM cars WHERE id = ? AND user_id = ?',
+            [carId, req.user.userId]
+        );
+        
+        if (carRows.length === 0) {
+            return res.status(404).json({
+                error: 'Auto nicht gefunden',
+                details: 'Das Auto gehört nicht zu diesem Benutzer'
+            });
+        }
+        
+        const car = carRows[0];
+        
+        if (!['connected', 'disconnected'].includes(type)) {
+            return res.status(400).json({
+                error: 'Ungültiger Typ',
+                details: 'type muss "connected" oder "disconnected" sein'
+            });
+        }
+        
+        // Erstelle Shortcut-Template
+        const shortcutTemplate = {
+            WFWorkflowActions: [
+                {
+                    WFWorkflowActionIdentifier: "is.workflow.actions.openurl",
+                    WFWorkflowActionParameters: {
+                        WFURLActionURL: `walkicar://bluetooth/${type}?carId=${carId}`
+                    }
+                },
+                {
+                    WFWorkflowActionIdentifier: "is.workflow.actions.notification",
+                    WFWorkflowActionParameters: {
+                        WFNotificationActionTitle: "WalkiCar",
+                        WFNotificationActionBody: `${car.name} ${type === 'connected' ? 'verbunden' : 'getrennt'} - Standort-Tracking ${type === 'connected' ? 'gestartet' : 'gestoppt'}`
+                    }
+                }
+            ],
+            WFWorkflowClientVersion: "900",
+            WFWorkflowMinimumClientVersion: 900,
+            WFWorkflowIcon: {
+                WFWorkflowIconStartColor: type === 'connected' ? 4278190080 : 16711680, // Blau oder Rot
+                WFWorkflowIconGlyphNumber: 57520
+            }
+        };
+        
+        const filename = `WalkiCar_${car.name}_${type === 'connected' ? 'Verbunden' : 'Getrennt'}.shortcut`;
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.json(shortcutTemplate);
+        
+    } catch (error) {
+        console.error('❌ Shortcut Download Error:', error);
+        res.status(500).json({
+            error: 'Shortcut konnte nicht erstellt werden',
+            details: error.message
+        });
+    }
+});
+
 module.exports = router;

@@ -90,21 +90,8 @@ class AutomationService: ObservableObject {
     
     private func notifyBackendBluetoothEvent(action: String, carId: Int, deviceId: String?) async {
         do {
-            let request = BluetoothEventRequest(
-                action: action,
-                carId: carId,
-                deviceId: deviceId,
-                timestamp: Date()
-            )
-            
-            let response: [String: String] = try await APIClient.shared.makeRequest(
-                endpoint: "/automation/bluetooth-event",
-                method: "POST",
-                body: request,
-                responseType: [String: String].self
-            )
-            
-            print("✅ AutomationService: Backend benachrichtigt - \(response["message"] ?? "OK")")
+            try await APIClient.shared.notifyBluetoothEvent(action: action, carId: carId, deviceId: deviceId)
+            print("✅ AutomationService: Backend benachrichtigt")
             
         } catch {
             print("❌ AutomationService: Fehler beim Benachrichtigen des Backends: \(error)")
@@ -115,10 +102,26 @@ class AutomationService: ObservableObject {
     
     func getAutomationTemplate(for carId: Int) async -> AutomationTemplate? {
         do {
-            let template: AutomationTemplate = try await APIClient.shared.makeRequest(
-                endpoint: "/automation/car/\(carId)/template",
-                method: "GET",
-                responseType: AutomationTemplate.self
+            let response = try await APIClient.shared.getAutomationTemplate(carId: carId)
+            
+            // Konvertiere Dictionary zu AutomationTemplate
+            guard let carData = response["car"] as? [String: Any],
+                  let carId = carData["id"] as? Int,
+                  let carName = carData["name"] as? String,
+                  let templatesData = response["templates"] as? [String: Any],
+                  let connectedURL = templatesData["connected"] as? String,
+                  let disconnectedURL = templatesData["disconnected"] as? String,
+                  let instructionsData = response["instructions"] as? [String: Any],
+                  let title = instructionsData["title"] as? String,
+                  let steps = instructionsData["steps"] as? [String] else {
+                print("❌ AutomationService: Template-Daten unvollständig")
+                return nil
+            }
+            
+            let template = AutomationTemplate(
+                car: CarInfo(id: carId, name: carName),
+                templates: URLTemplates(connected: connectedURL, disconnected: disconnectedURL),
+                instructions: Instructions(title: title, steps: steps)
             )
             
             return template
@@ -162,13 +165,6 @@ class AutomationService: ObservableObject {
 }
 
 // MARK: - Data Models
-
-struct BluetoothEventRequest: Codable {
-    let action: String
-    let carId: Int
-    let deviceId: String?
-    let timestamp: Date
-}
 
 struct AutomationTemplate: Codable {
     let car: CarInfo
