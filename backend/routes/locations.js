@@ -67,20 +67,20 @@ router.post('/update', authenticateToken, async (req, res) => {
             [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude]
         );
 
-        // Wenn Bluetooth verbunden, geparkten Standort aktualisieren
-        if (bluetooth_connected && car_id) {
-            await query(
-                `INSERT INTO parked_locations 
-                 (user_id, car_id, latitude, longitude, accuracy, last_live_update) 
-                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                 ON DUPLICATE KEY UPDATE 
-                 latitude = VALUES(latitude),
-                 longitude = VALUES(longitude),
-                 accuracy = VALUES(accuracy),
-                 last_live_update = CURRENT_TIMESTAMP`,
-                [userId, car_id, latitude, longitude, accuracy]
-            );
-        }
+        // Geparkte Standorte-Logik temporär deaktiviert (bis neue Tabellen erstellt sind)
+        // if (bluetooth_connected && car_id) {
+        //     await query(
+        //         `INSERT INTO parked_locations 
+        //          (user_id, car_id, latitude, longitude, accuracy, last_live_update) 
+        //          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        //          ON DUPLICATE KEY UPDATE 
+        //          latitude = VALUES(latitude),
+        //          longitude = VALUES(longitude),
+        //          accuracy = VALUES(accuracy),
+        //          last_live_update = CURRENT_TIMESTAMP`,
+        //         [userId, car_id, latitude, longitude, accuracy]
+        //     );
+        // }
 
         res.json({
             message: 'Standort erfolgreich aktualisiert',
@@ -102,7 +102,7 @@ router.get('/live', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Hole alle Live-Standorte von Freunden
+        // Hole alle Live-Standorte von Freunden (temporär ohne neue Spalten)
         const liveLocations = await query(`
             SELECT DISTINCT
                 l.id,
@@ -114,9 +114,6 @@ router.get('/live', authenticateToken, async (req, res) => {
                 l.speed,
                 l.heading,
                 l.altitude,
-                l.is_live,
-                l.is_parked,
-                l.bluetooth_connected,
                 l.timestamp,
                 u.username,
                 u.display_name,
@@ -133,40 +130,12 @@ router.get('/live', authenticateToken, async (req, res) => {
                 (f.friend_id = ? AND f.user_id = l.user_id)
             )
             WHERE f.status = 'accepted'
-            AND l.is_live = true
             AND l.timestamp > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
             ORDER BY l.timestamp DESC
         `, [userId, userId]);
 
-        // Hole auch geparkte Standorte von Freunden
-        const parkedLocations = await query(`
-            SELECT DISTINCT
-                p.id,
-                p.user_id,
-                p.car_id,
-                p.latitude,
-                p.longitude,
-                p.accuracy,
-                p.parked_at,
-                p.last_live_update,
-                u.username,
-                u.display_name,
-                u.profile_picture_url,
-                c.name as car_name,
-                c.brand,
-                c.model,
-                c.color
-            FROM parked_locations p
-            JOIN users u ON p.user_id = u.id
-            LEFT JOIN cars c ON p.car_id = c.id
-            JOIN friendships f ON (
-                (f.user_id = ? AND f.friend_id = p.user_id) OR 
-                (f.friend_id = ? AND f.user_id = p.user_id)
-            )
-            WHERE f.status = 'accepted'
-            AND p.last_live_update > DATE_SUB(NOW(), INTERVAL 1 HOUR)
-            ORDER BY p.last_live_update DESC
-        `, [userId, userId]);
+        // Geparkte Standorte temporär deaktiviert (bis neue Tabellen erstellt sind)
+        const parkedLocations = [];
 
         res.json({
             live_locations: liveLocations,
@@ -206,11 +175,11 @@ router.post('/park', authenticateToken, async (req, res) => {
             });
         }
 
-        // Aktuellen Standort als geparkt markieren
-        await query(
-            'UPDATE locations SET is_live = false, is_parked = true, bluetooth_connected = false WHERE user_id = ? AND car_id = ? AND is_live = true',
-            [userId, car_id]
-        );
+        // Parken temporär deaktiviert (bis neue Spalten erstellt sind)
+        // await query(
+        //     'UPDATE locations SET is_live = false, is_parked = true, bluetooth_connected = false WHERE user_id = ? AND car_id = ? AND is_live = true',
+        //     [userId, car_id]
+        // );
 
         res.json({
             message: 'Fahrzeug erfolgreich als geparkt markiert',

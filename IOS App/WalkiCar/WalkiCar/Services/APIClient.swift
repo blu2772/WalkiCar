@@ -288,10 +288,11 @@ class APIClient: ObservableObject {
     
     func parkCar(_ request: ParkCarRequest) async throws {
         print("🌐 APIClient: Parke Fahrzeug ID: \(request.carId)")
-        _ = try await makeRequestDict(
+        let response: [String: String] = try await makeRequest(
             endpoint: "/locations/park",
             method: "POST",
             body: request,
+            responseType: [String: String].self,
             requiresAuth: true
         )
     }
@@ -309,10 +310,11 @@ class APIClient: ObservableObject {
     
     func updateLocationSettings(_ request: LocationSettingsRequest) async throws {
         print("🌐 APIClient: Aktualisiere Standort-Einstellungen")
-        _ = try await makeRequestDict(
+        let response: [String: String] = try await makeRequest(
             endpoint: "/locations/settings",
             method: "PUT",
             body: request,
+            responseType: [String: String].self,
             requiresAuth: true
         )
     }

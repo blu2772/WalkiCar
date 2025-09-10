@@ -1,5 +1,5 @@
 import Foundation
-// import SocketIO // Wird später hinzugefügt wenn SocketIO installiert ist
+import SocketIO 
 
 class WebSocketManager: ObservableObject {
     static let shared = WebSocketManager()
