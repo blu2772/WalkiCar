@@ -30,7 +30,7 @@ struct BluetoothScanView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                         
-                        Text("Suche nach verfügbaren Bluetooth-Geräten")
+                        Text("Zeige bereits verbundene Auto-Bluetooth-Geräte")
                             .font(.system(size: 14))
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -49,7 +49,7 @@ struct BluetoothScanView: View {
                             Image(systemName: garageManager.isScanning ? "stop.fill" : "magnifyingglass")
                                 .font(.system(size: 16, weight: .medium))
                             
-                            Text(garageManager.isScanning ? "Scan stoppen" : "Scan starten")
+                            Text(garageManager.isScanning ? "Suche stoppen" : "Verbundene Geräte laden")
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundColor(.white)
@@ -64,7 +64,7 @@ struct BluetoothScanView: View {
                     // Devices List
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {
-                            Text("Gefundene Geräte")
+                            Text("Verbundene Auto-Geräte")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
                             
@@ -77,15 +77,15 @@ struct BluetoothScanView: View {
                         
                         if garageManager.bluetoothDevices.isEmpty && !garageManager.isScanning {
                             VStack(spacing: 20) {
-                                Image(systemName: "bluetooth")
+                                Image(systemName: "antenna.radiowaves.left.and.right")
                                     .font(.system(size: 60))
                                     .foregroundColor(.gray)
                                 
-                                Text("Keine Geräte gefunden")
+                                Text("Keine verbundenen Auto-Geräte")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.white)
                                 
-                                Text("Starte einen Scan um Bluetooth-Geräte zu finden")
+                                Text("Verbinde dein iPhone zuerst mit dem Auto-Bluetooth, dann lade die Geräte")
                                     .font(.system(size: 14))
                                     .foregroundColor(.gray)
                                     .multilineTextAlignment(.center)
@@ -135,7 +135,7 @@ struct BluetoothScanView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            garageManager.startBluetoothScan()
+            garageManager.retrieveConnectedDevices()
         }
         .onDisappear {
             garageManager.stopBluetoothScan()
@@ -154,10 +154,10 @@ struct BluetoothDeviceRowView: View {
                 // Bluetooth Icon
                 ZStack {
                     Circle()
-                        .fill(isSelected ? Color.blue : Color.gray)
+                        .fill(device.isConnected ? (isSelected ? Color.blue : Color.green) : (isSelected ? Color.blue : Color.gray))
                         .frame(width: 40, height: 40)
                     
-                    Image(systemName: "bluetooth")
+                    Image(systemName: device.isConnected ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                 }
@@ -167,9 +167,22 @@ struct BluetoothDeviceRowView: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                     
-                    Text("ID: \(device.id)")
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                    HStack(spacing: 8) {
+                        Text("ID: \(device.id.prefix(8))...")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        if device.isConnected {
+                            HStack(spacing: 2) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 6, height: 6)
+                                Text("Verbunden")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.green)
+                            }
+                        }
+                    }
                     
                     if let signalStrength = device.signalStrength {
                         HStack(spacing: 4) {

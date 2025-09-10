@@ -19,6 +19,28 @@ class GarageManager: NSObject, ObservableObject {
     private let apiClient = APIClient.shared
     private var centralManager: CBCentralManager?
     
+    // Service-UUIDs für Auto-Bluetooth-Geräte (erweiterte Liste)
+    private let carServiceUUIDs: [CBUUID] = [
+        // Audio/Media Services
+        CBUUID(string: "110A"), // Audio Source
+        CBUUID(string: "110B"), // Audio Sink
+        CBUUID(string: "110E"), // A2DP Advanced Audio Distribution Profile
+        CBUUID(string: "111E"), // Hands-Free Profile
+        CBUUID(string: "1108"), // Headset Profile
+        CBUUID(string: "1105"), // Object Push Profile
+        CBUUID(string: "1106"), // File Transfer Profile
+        // Generic Services
+        CBUUID(string: "1800"), // Generic Access Profile
+        CBUUID(string: "1801"), // Generic Attribute Profile
+        CBUUID(string: "180A"), // Device Information
+        CBUUID(string: "180F"), // Battery Service
+        // Auto-spezifische Services (falls bekannt)
+        CBUUID(string: "1812"), // Human Interface Device
+        CBUUID(string: "1813"), // Scan Parameters
+        CBUUID(string: "1814"), // Running Speed and Cadence
+        CBUUID(string: "1815"), // Cycling Speed and Cadence
+    ]
+    
     var activeCar: Car? {
         cars.first { $0.isActive }
     }
@@ -213,7 +235,10 @@ class GarageManager: NSObject, ObservableObject {
         isScanning = true
         bluetoothDevices = []
         
-        // Scanne nach verfügbaren Bluetooth-Geräten
+        // Hole bereits verbundene Geräte (bevorzugt)
+        retrieveConnectedDevices()
+        
+        // Zusätzlich: Scanne nach neuen Geräten (optional)
         centralManager.scanForPeripherals(withServices: nil, options: [
             CBCentralManagerScanOptionAllowDuplicatesKey: false
         ])
@@ -221,6 +246,98 @@ class GarageManager: NSObject, ObservableObject {
         // Stoppe Scan nach 10 Sekunden
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
             self.stopBluetoothScan()
+        }
+    }
+    
+    func retrieveConnectedDevices() {
+        guard let centralManager = centralManager, centralManager.state == .poweredOn else {
+            errorMessage = "Bluetooth ist nicht verfügbar"
+            return
+        }
+        
+        // Methode 1: Hole bereits verbundene Geräte für Auto-Services
+        let connectedPeripherals = centralManager.retrieveConnectedPeripherals(withServices: carServiceUUIDs)
+        
+        // Methode 1b: Hole ALLE verbundenen Geräte (mit leeren Services)
+        let allConnectedPeripherals = centralManager.retrieveConnectedPeripherals(withServices: [])
+        
+        print("🔵 Gefundene verbundene Bluetooth-Geräte (mit Services): \(connectedPeripherals.count)")
+        print("🔵 Gefundene verbundene Bluetooth-Geräte (alle): \(allConnectedPeripherals.count)")
+        
+        Task { @MainActor in
+            var foundConnectedDevices = 0
+            
+            // Füge verbundene Geräte mit bekannten Services hinzu
+            for peripheral in connectedPeripherals {
+                let deviceName = peripheral.name ?? "Verbundenes Auto-Gerät"
+                let deviceId = peripheral.identifier.uuidString
+                
+                if !self.bluetoothDevices.contains(where: { $0.id == deviceId }) {
+                    let device = BluetoothDevice(
+                        id: deviceId,
+                        name: deviceName,
+                        isConnected: true,
+                        signalStrength: nil
+                    )
+                    
+                    self.bluetoothDevices.append(device)
+                    foundConnectedDevices += 1
+                    print("✅ Verbundenes Bluetooth-Gerät hinzugefügt: \(deviceName)")
+                }
+            }
+            
+            // Methode 2: Falls keine Geräte mit Services gefunden, prüfe alle verbundenen Geräte
+            if foundConnectedDevices == 0 {
+                print("ℹ️ Keine verbundenen Auto-Bluetooth-Geräte mit bekannten Services gefunden")
+                print("ℹ️ Prüfe alle verbundenen Geräte...")
+                
+                // Füge alle anderen verbundenen Geräte hinzu
+                for peripheral in allConnectedPeripherals {
+                    let deviceName = peripheral.name ?? "Verbundenes Gerät"
+                    let deviceId = peripheral.identifier.uuidString
+                    
+                    if !self.bluetoothDevices.contains(where: { $0.id == deviceId }) {
+                        let device = BluetoothDevice(
+                            id: deviceId,
+                            name: deviceName,
+                            isConnected: true,
+                            signalStrength: nil
+                        )
+                        
+                        self.bluetoothDevices.append(device)
+                        foundConnectedDevices += 1
+                        print("✅ Verbundenes Gerät hinzugefügt: \(deviceName)")
+                    }
+                }
+            }
+            
+            // Methode 3: Falls immer noch keine verbundenen Geräte, zeige alle gescannten Geräte
+            if foundConnectedDevices == 0 {
+                print("ℹ️ Keine verbundenen Bluetooth-Geräte gefunden")
+                print("ℹ️ Zeige alle verfügbaren Bluetooth-Geräte zur Auswahl")
+                
+                // Filtere gescannte Geräte nach Auto-relevanten Namen
+                let autoKeywords = ["car", "auto", "vehicle", "bmw", "audi", "mercedes", "volkswagen", "ford", "toyota", "honda", "nissan", "hyundai", "kia", "seat", "skoda", "opel", "peugeot", "renault", "fiat", "alfa", "jaguar", "land rover", "mini", "smart", "tesla", "porsche", "ferrari", "lamborghini", "maserati", "bentley", "rolls", "lexus", "infiniti", "acura", "cadillac", "lincoln", "buick", "chevrolet", "gmc", "dodge", "chrysler", "jeep", "ram"]
+                
+                // Füge bereits gescannte Geräte hinzu, die Auto-relevant sein könnten
+                for device in self.bluetoothDevices {
+                    let deviceNameLower = device.name.lowercased()
+                    let isAutoRelevant = autoKeywords.contains { keyword in
+                        deviceNameLower.contains(keyword)
+                    }
+                    
+                    if isAutoRelevant && !device.isConnected {
+                        // Markiere als potentiell Auto-relevant
+                        print("🚗 Potentiell Auto-relevantes Gerät gefunden: \(device.name)")
+                    }
+                }
+                
+                if self.bluetoothDevices.isEmpty {
+                    self.errorMessage = "Keine Bluetooth-Geräte gefunden. Stelle sicher, dass Bluetooth aktiviert ist und Geräte in der Nähe sind."
+                } else {
+                    self.errorMessage = "Keine verbundenen Geräte gefunden. Wähle ein verfügbares Gerät aus der Liste oder verbinde dein iPhone zuerst mit dem Auto-Bluetooth."
+                }
+            }
         }
     }
     

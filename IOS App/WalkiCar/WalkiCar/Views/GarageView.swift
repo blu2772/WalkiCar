@@ -11,6 +11,7 @@ struct GarageView: View {
     @StateObject private var garageManager = GarageManager()
     @State private var showingAddCar = false
     @State private var showingBluetoothScan = false
+    @State private var showingEditCar: Car? = nil
     
     var body: some View {
         NavigationView {
@@ -100,7 +101,13 @@ struct GarageView: View {
                             ScrollView {
                                 LazyVStack(spacing: 12) {
                                     ForEach(garageManager.cars) { car in
-                                        CarCardView(car: car, isActive: car.isActive)
+                                        CarCardView(
+                                            car: car, 
+                                            isActive: car.isActive,
+                                            onEdit: { showingEditCar = car },
+                                            onDelete: { deleteCar(car) },
+                                            onSetActive: { setActiveCar(car) }
+                                        )
                                     }
                                 }
                             }
@@ -120,15 +127,31 @@ struct GarageView: View {
         .sheet(isPresented: $showingBluetoothScan) {
             BluetoothScanView(garageManager: garageManager)
         }
+        .sheet(item: $showingEditCar) { car in
+            EditCarView(garageManager: garageManager, car: car)
+        }
         .onAppear {
             garageManager.loadGarage()
         }
+    }
+    
+    private func deleteCar(_ car: Car) {
+        garageManager.deleteCar(carId: car.id)
+    }
+    
+    private func setActiveCar(_ car: Car) {
+        garageManager.setActiveCar(carId: car.id)
     }
 }
 
 struct CarCardView: View {
     let car: Car
     let isActive: Bool
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    let onSetActive: () -> Void
+    
+    @State private var showingDeleteConfirmation = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -163,16 +186,45 @@ struct CarCardView: View {
                 
                 Spacer()
                 
-                VStack(spacing: 4) {
-                    if isActive {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 8, height: 8)
+                VStack(spacing: 8) {
+                    // Status
+                    VStack(spacing: 4) {
+                        if isActive {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                        }
+                        
+                        Text(isActive ? "Aktiv" : "Inaktiv")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(isActive ? .green : .gray)
                     }
                     
-                    Text(isActive ? "Aktiv" : "Inaktiv")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(isActive ? .green : .gray)
+                    // Action Buttons
+                    HStack(spacing: 8) {
+                        // Set Active Button
+                        if !isActive {
+                            Button(action: onSetActive) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        // Edit Button
+                        Button(action: onEdit) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                        }
+                        
+                        // Delete Button
+                        Button(action: { showingDeleteConfirmation = true }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 16))
+                                .foregroundColor(.red)
+                        }
+                    }
                 }
             }
         }
@@ -180,6 +232,14 @@ struct CarCardView: View {
         .padding(.vertical, 16)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
+        .alert("Fahrzeug löschen", isPresented: $showingDeleteConfirmation) {
+            Button("Abbrechen", role: .cancel) { }
+            Button("Löschen", role: .destructive) {
+                onDelete()
+            }
+        } message: {
+            Text("Möchtest du '\(car.name)' wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")
+        }
     }
     
     private var carColor: Color {
@@ -206,4 +266,27 @@ struct CarCardView: View {
 
 #Preview {
     GarageView()
+}
+
+#Preview("CarCardView") {
+    CarCardView(
+        car: Car(
+            id: 1,
+            name: "Mein Auto",
+            brand: "BMW",
+            model: "X5",
+            year: 2020,
+            color: "Schwarz",
+            bluetoothIdentifier: "ABC123",
+            isActive: false,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-01T00:00:00Z"
+        ),
+        isActive: false,
+        onEdit: {},
+        onDelete: {},
+        onSetActive: {}
+    )
+    .padding()
+    .background(Color.black)
 }
