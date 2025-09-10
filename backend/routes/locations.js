@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../config/database');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const Joi = require('joi');
 
 // Joi Validation Schemas
@@ -25,7 +25,7 @@ const locationSettingsSchema = Joi.object({
 });
 
 // POST /locations/update - Live-Standort aktualisieren
-router.post('/update', auth, async (req, res) => {
+router.post('/update', authenticateToken, async (req, res) => {
     try {
         const { error, value } = locationUpdateSchema.validate(req.body);
         if (error) {
@@ -98,7 +98,7 @@ router.post('/update', auth, async (req, res) => {
 });
 
 // GET /locations/live - Live-Standorte aller Freunde abrufen
-router.get('/live', auth, async (req, res) => {
+router.get('/live', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
 
@@ -184,7 +184,7 @@ router.get('/live', auth, async (req, res) => {
 });
 
 // POST /locations/park - Fahrzeug als geparkt markieren
-router.post('/park', auth, async (req, res) => {
+router.post('/park', authenticateToken, async (req, res) => {
     try {
         const { car_id } = req.body;
         const userId = req.user.id;
