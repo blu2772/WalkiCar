@@ -52,7 +52,13 @@ struct GarageView: View {
                                     .frame(width: 8, height: 8)
                             }
                             
-                            CarCardView(car: activeCar, isActive: true)
+                            CarCardView(
+                                car: activeCar, 
+                                isActive: true,
+                                onEdit: { showingEditCar = activeCar },
+                                onDelete: { deleteCar(activeCar) },
+                                onSetActive: { setActiveCar(activeCar) }
+                            )
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 30)

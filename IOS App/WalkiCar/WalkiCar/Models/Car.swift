@@ -144,7 +144,7 @@ struct GarageResponse: Codable {
 }
 
 // Bluetooth-Gerät Modell
-struct BluetoothDevice: Identifiable {
+struct BluetoothDevice: Identifiable, Equatable {
     let id: String
     let name: String
     let isConnected: Bool
@@ -155,5 +155,10 @@ struct BluetoothDevice: Identifiable {
         self.name = name
         self.isConnected = isConnected
         self.signalStrength = signalStrength
+    }
+    
+    // Equatable conformance
+    static func == (lhs: BluetoothDevice, rhs: BluetoothDevice) -> Bool {
+        return lhs.id == rhs.id
     }
 }

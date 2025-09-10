@@ -35,11 +35,18 @@ router.post('/update', authenticateToken, async (req, res) => {
 
         console.log('📍 User ID:', userId, 'Car ID:', car_id);
 
+        // Konvertiere undefined zu null für SQL
+        const carIdForDB = car_id || null;
+        const accuracyForDB = accuracy || null;
+        const speedForDB = speed || null;
+        const headingForDB = heading || null;
+        const altitudeForDB = altitude || null;
+
         // Prüfe ob Auto dem Benutzer gehört (nur wenn car_id angegeben)
-        if (car_id) {
+        if (carIdForDB) {
             const carCheck = await query(
                 'SELECT id FROM cars WHERE id = ? AND user_id = ?',
-                [car_id, userId]
+                [carIdForDB, userId]
             );
             if (carCheck.length === 0) {
                 console.log('❌ Car not found or not authorized');
@@ -54,7 +61,7 @@ router.post('/update', authenticateToken, async (req, res) => {
             `INSERT INTO locations 
              (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, car_id, latitude, longitude, accuracy, speed, heading, altitude]
+            [userId, carIdForDB, latitude, longitude, accuracyForDB, speedForDB, headingForDB, altitudeForDB]
         );
 
         console.log('✅ Location inserted with ID:', locationResult.insertId);
