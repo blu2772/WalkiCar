@@ -81,7 +81,58 @@ router.post('/update', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /locations/live - Live-Standorte aller Freunde abrufen (mit Freunde-System)
+// POST /locations/park - Auto als geparkt markieren
+router.post('/park', authenticateToken, async (req, res) => {
+    try {
+        console.log('🅿️ Park Request:', req.body);
+        
+        const { carId } = req.body;
+        const userId = req.user.id;
+        
+        if (!carId) {
+            return res.status(400).json({
+                error: 'Auto-ID ist erforderlich'
+            });
+        }
+        
+        // Prüfe ob Auto dem Benutzer gehört
+        const carCheck = await query(
+            'SELECT id FROM cars WHERE id = ? AND user_id = ?',
+            [carId, userId]
+        );
+        
+        if (carCheck.length === 0) {
+            return res.status(404).json({
+                error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
+            });
+        }
+        
+        // Sende einen finalen Standort-Eintrag mit aktueller Position
+        // Das wird das Auto als "geparkt" markieren (älter als 5 Minuten)
+        const parkResult = await query(
+            `INSERT INTO locations 
+             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, carId, null, null, null, null, null, null]
+        );
+        
+        console.log('✅ Auto geparkt mit Location ID:', parkResult.insertId);
+        
+        res.json({
+            message: 'Auto erfolgreich geparkt',
+            location_id: parkResult.insertId,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Park-Fehler:', error);
+        res.status(500).json({
+            error: 'Auto konnte nicht geparkt werden',
+            details: error.message
+        });
+    }
+});
+
 router.get('/live', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
