@@ -15,6 +15,7 @@ struct Car: Codable, Identifiable {
     let year: Int?
     let color: String?
     let bluetoothIdentifier: String?
+    let audioDeviceNames: [String]?
     let isActive: Bool
     let createdAt: String?
     let updatedAt: String?
@@ -27,13 +28,14 @@ struct Car: Codable, Identifiable {
         case year
         case color
         case bluetoothIdentifier = "bluetooth_identifier"
+        case audioDeviceNames = "audio_device_names"
         case isActive = "is_active"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
     
     // Manual initializer
-    init(id: Int, name: String, brand: String?, model: String?, year: Int?, color: String?, bluetoothIdentifier: String?, isActive: Bool, createdAt: String?, updatedAt: String?) {
+    init(id: Int, name: String, brand: String?, model: String?, year: Int?, color: String?, bluetoothIdentifier: String?, audioDeviceNames: [String]?, isActive: Bool, createdAt: String?, updatedAt: String?) {
         self.id = id
         self.name = name
         self.brand = brand
@@ -41,6 +43,7 @@ struct Car: Codable, Identifiable {
         self.year = year
         self.color = color
         self.bluetoothIdentifier = bluetoothIdentifier
+        self.audioDeviceNames = audioDeviceNames
         self.isActive = isActive
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -57,6 +60,7 @@ struct Car: Codable, Identifiable {
         year = try container.decodeIfPresent(Int.self, forKey: .year)
         color = try container.decodeIfPresent(String.self, forKey: .color)
         bluetoothIdentifier = try container.decodeIfPresent(String.self, forKey: .bluetoothIdentifier)
+        audioDeviceNames = try container.decodeIfPresent([String].self, forKey: .audioDeviceNames)
         
         // Flexible is_active Dekodierung (0/1 oder true/false)
         if let boolValue = try? container.decode(Bool.self, forKey: .isActive) {
@@ -98,6 +102,7 @@ struct CarCreateRequest: Codable {
     let year: Int?
     let color: String?
     let bluetoothIdentifier: String?
+    let audioDeviceNames: [String]?
     
     enum CodingKeys: String, CodingKey {
         case name
@@ -106,6 +111,7 @@ struct CarCreateRequest: Codable {
         case year
         case color
         case bluetoothIdentifier = "bluetooth_identifier"
+        case audioDeviceNames = "audio_device_names"
     }
 }
 
@@ -116,6 +122,7 @@ struct CarUpdateRequest: Codable {
     let year: Int?
     let color: String?
     let bluetoothIdentifier: String?
+    let audioDeviceNames: [String]?
     let isActive: Bool?
     
     enum CodingKeys: String, CodingKey {
@@ -125,6 +132,7 @@ struct CarUpdateRequest: Codable {
         case year
         case color
         case bluetoothIdentifier = "bluetooth_identifier"
+        case audioDeviceNames = "audio_device_names"
         case isActive = "is_active"
     }
 }

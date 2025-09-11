@@ -102,6 +102,12 @@ CREATE TABLE IF NOT EXISTS location_history (
     INDEX idx_history_time (timestamp)
 );
 
+-- Erweitere cars Tabelle um audio_device_names für Audio-Route-Überwachung
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS audio_device_names JSON DEFAULT NULL COMMENT 'Array von Audio-Geräte-Namen für automatische Auto-Aktivierung';
+
+-- Erstelle Index für bessere Performance bei Audio-Geräte-Suche
+CREATE INDEX IF NOT EXISTS idx_cars_audio_device_names ON cars((CAST(audio_device_names AS CHAR(255) ARRAY)));
+
 -- Zeige aktuelle Struktur der locations Tabelle
 DESCRIBE locations;
 

@@ -12,6 +12,7 @@ struct WalkiCarApp: App {
     @StateObject private var authManager = AuthManager()
     @StateObject private var garageManager = GarageManager()
     @StateObject private var locationManager = LocationManager.shared
+    @StateObject private var audioWatcher = CarAudioWatcher.shared
     
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct WalkiCarApp: App {
                 .environmentObject(authManager)
                 .environmentObject(garageManager)
                 .environmentObject(locationManager)
+                .environmentObject(audioWatcher)
                 .preferredColorScheme(.dark)
                 .onAppear {
                     // Initialisiere AppStateManager mit den Managern
@@ -26,6 +28,9 @@ struct WalkiCarApp: App {
                         garageManager: garageManager,
                         locationManager: locationManager
                     )
+                    
+                    // Starte Audio-Route-Überwachung
+                    audioWatcher.startMonitoring()
                 }
         }
     }

@@ -22,7 +22,6 @@ struct EditCarView: View {
     @State private var showingBluetoothScan = false
     @State private var selectedDevice: BluetoothDevice?
     @State private var showingDeleteConfirmation = false
-    @State private var showingShortcutSetup = false
     
     init(garageManager: GarageManager, car: Car) {
         self.garageManager = garageManager
@@ -147,24 +146,6 @@ struct EditCarView: View {
                                     .background(Color.gray.opacity(0.1))
                                     .cornerRadius(8)
                                 }
-                                
-                                // Shortcut Setup Button
-                                if !bluetoothIdentifier.isEmpty {
-                                    Button(action: { showingShortcutSetup = true }) {
-                                        HStack {
-                                            Image(systemName: "app.badge")
-                                                .font(.system(size: 14, weight: .medium))
-                                            
-                                            Text("Shortcut für automatisches Tracking einrichten")
-                                                .font(.system(size: 14, weight: .medium))
-                                        }
-                                        .foregroundColor(.blue)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(8)
-                                    }
-                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -223,9 +204,6 @@ struct EditCarView: View {
         }
         .sheet(isPresented: $showingBluetoothScan) {
             BluetoothScanView(garageManager: garageManager, selectedDevice: $selectedDevice)
-        }
-        .sheet(isPresented: $showingShortcutSetup) {
-            ShortcutSetupView(car: car)
         }
         .alert("Fahrzeug löschen", isPresented: $showingDeleteConfirmation) {
             Button("Abbrechen", role: .cancel) { }

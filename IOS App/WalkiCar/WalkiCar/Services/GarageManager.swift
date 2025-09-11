@@ -446,9 +446,36 @@ class GarageManager: NSObject, ObservableObject {
             }
         }
     }
-}
-
-// MARK: - CBCentralManagerDelegate
+    
+    func setAudioDevices(carId: Int, audioDeviceNames: [String]) {
+        Task {
+            do {
+                let updatedCar = try await apiClient.setAudioDevices(carId: carId, audioDeviceNames: audioDeviceNames)
+                await MainActor.run {
+                    // Aktualisiere lokale Daten
+                    for i in 0..<self.cars.count {
+                        if self.cars[i].id == carId {
+                            self.cars[i] = updatedCar
+                            break
+                        }
+                    }
+                    print("🎵 GarageManager: Audio-Geräte für Auto ID \(carId) gesetzt: \(audioDeviceNames)")
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    print("❌ GarageManager: Fehler beim Setzen der Audio-Geräte: \(error)")
+                }
+            }
+        }
+    }
+    
+    func getConnectedAudioDevices() -> [String] {
+        // Hole verbundene Audio-Geräte vom CarAudioWatcher
+        return CarAudioWatcher.shared.getConnectedAudioDevices()
+    }
+    
+    // MARK: - CBCentralManagerDelegate
 
 extension GarageManager: CBCentralManagerDelegate {
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {

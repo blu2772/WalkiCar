@@ -253,6 +253,16 @@ class APIClient: ObservableObject {
         )
     }
     
+    func setAudioDevices(carId: Int, audioDeviceNames: [String]) async throws -> Car {
+        let request = ["audio_device_names": audioDeviceNames]
+        return try await makeRequest(
+            endpoint: "/cars/set-audio-devices/\(carId)",
+            method: "PUT",
+            body: request,
+            responseType: CarResponse.self
+        ).car
+    }
+    
     func setActiveCar(carId: Int) async throws {
         print("🌐 APIClient: Setze aktives Fahrzeug ID: \(carId)")
         _ = try await makeRequestDict(

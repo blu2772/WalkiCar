@@ -121,37 +121,49 @@ class AppStateManager: ObservableObject {
         }
     }
     
-    // MARK: - Shortcuts Integration
-    
-    func onBluetoothConnected(deviceId: String, carId: Int) {
+    func onAudioRouteChanged(connectedDevices: [String]) {
         guard let garageManager = garageManager,
               let locationManager = locationManager else {
-            print("🏠 AppStateManager: Manager noch nicht verfügbar für Bluetooth-Verbindung")
+            print("🏠 AppStateManager: Manager noch nicht verfügbar für Audio-Route-Änderung")
             return
         }
         
-        print("🏠 AppStateManager: Bluetooth-Verbindung über Shortcut erkannt - Car ID: \(carId)")
+        print("🏠 AppStateManager: Audio-Route geändert - \(connectedDevices.count) Geräte verbunden")
         
-        // Aktiviere das Auto
-        garageManager.setActiveCar(carId: carId)
-        
-        // Starte Standort-Tracking
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            locationManager.startLocationTracking()
-            print("🏠 AppStateManager: Standort-Tracking für Auto \(carId) gestartet")
+        // Prüfe ob eines der verbundenen Audio-Geräte einem Auto zugeordnet ist
+        for deviceName in connectedDevices {
+            if let car = garageManager.cars.first(where: { car in
+                car.audioDeviceNames?.contains(deviceName) == true
+            }) {
+                print("🚗 AppStateManager: Audio-Gerät '\(deviceName)' gehört zu Auto '\(car.name)'")
+                
+                if !car.isActive {
+                    print("🚗 AppStateManager: Aktiviere Auto automatisch über Audio-Verbindung...")
+                    garageManager.setActiveCar(carId: car.id)
+                    
+                    // Starte Standort-Tracking
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        locationManager.startLocationTracking()
+                        print("🚗 AppStateManager: Standort-Tracking für Auto '\(car.name)' gestartet")
+                    }
+                } else {
+                    print("🚗 AppStateManager: Auto '\(car.name)' ist bereits aktiv")
+                }
+            }
         }
-    }
-    
-    func onBluetoothDisconnected(deviceId: String, carId: Int) {
-        guard let locationManager = locationManager else {
-            print("🏠 AppStateManager: LocationManager noch nicht verfügbar für Bluetooth-Trennung")
-            return
+        
+        // Prüfe auch, ob aktives Auto noch über Audio verbunden ist
+        if let activeCar = garageManager.activeCar,
+           let audioDevices = activeCar.audioDeviceNames {
+            let isStillConnected = connectedDevices.contains { deviceName in
+                audioDevices.contains(deviceName)
+            }
+            
+            if !isStillConnected {
+                print("🚗 AppStateManager: Audio-Verbindung zu aktivem Auto verloren: \(activeCar.name)")
+                print("🚗 AppStateManager: Stoppe Standort-Tracking...")
+                locationManager.stopLocationTracking()
+            }
         }
-        
-        print("🏠 AppStateManager: Bluetooth-Trennung über Shortcut erkannt - Car ID: \(carId)")
-        
-        // Stoppe Standort-Tracking
-        locationManager.stopLocationTracking()
-        print("🏠 AppStateManager: Standort-Tracking für Auto \(carId) gestoppt")
     }
 }

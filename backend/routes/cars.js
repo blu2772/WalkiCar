@@ -11,7 +11,8 @@ const carSchema = Joi.object({
   model: Joi.string().max(50).optional(),
   year: Joi.number().integer().min(1900).max(new Date().getFullYear() + 1).optional(),
   color: Joi.string().max(30).optional(),
-  bluetooth_identifier: Joi.string().max(100).optional()
+  bluetooth_identifier: Joi.string().max(100).optional(),
+  audio_device_names: Joi.array().items(Joi.string().max(100)).optional()
 });
 
 const carUpdateSchema = Joi.object({
@@ -21,6 +22,7 @@ const carUpdateSchema = Joi.object({
   year: Joi.number().integer().min(1900).max(new Date().getFullYear() + 1).optional(),
   color: Joi.string().max(30).optional(),
   bluetooth_identifier: Joi.string().max(100).optional(),
+  audio_device_names: Joi.array().items(Joi.string().max(100)).optional(),
   is_active: Joi.boolean().optional()
 });
 
@@ -30,7 +32,7 @@ router.get('/garage', async (req, res) => {
     const userId = req.user.id;
 
     const cars = await query(
-      `SELECT id, name, brand, model, year, color, bluetooth_identifier, is_active, created_at, updated_at
+      `SELECT id, name, brand, model, year, color, bluetooth_identifier, audio_device_names, is_active, created_at, updated_at
        FROM cars 
        WHERE user_id = ? 
        ORDER BY is_active DESC, created_at DESC`,
@@ -58,7 +60,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    const { name, brand, model, year, color, bluetooth_identifier } = value;
+    const { name, brand, model, year, color, bluetooth_identifier, audio_device_names } = value;
     const userId = req.user.id;
 
     // Überprüfe ob bereits ein Fahrzeug mit diesem Namen existiert
@@ -73,9 +75,9 @@ router.post('/create', async (req, res) => {
 
     // Erstelle neues Fahrzeug
     const result = await query(
-      `INSERT INTO cars (user_id, name, brand, model, year, color, bluetooth_identifier, is_active) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
-      [userId, name, brand, model, year, color, bluetooth_identifier]
+      `INSERT INTO cars (user_id, name, brand, model, year, color, bluetooth_identifier, audio_device_names, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+      [userId, name, brand, model, year, color, bluetooth_identifier, JSON.stringify(audio_device_names)]
     );
 
     const carId = result.insertId;
@@ -138,8 +140,14 @@ router.put('/update/:car_id', async (req, res) => {
     
     Object.keys(value).forEach(key => {
       if (value[key] !== undefined) {
-        updateFields.push(`${key} = ?`);
-        updateValues.push(value[key]);
+        if (key === 'audio_device_names') {
+          // Spezielle Behandlung für JSON-Array
+          updateFields.push(`${key} = ?`);
+          updateValues.push(JSON.stringify(value[key]));
+        } else {
+          updateFields.push(`${key} = ?`);
+          updateValues.push(value[key]);
+        }
       }
     });
 
@@ -238,6 +246,54 @@ router.put('/set-active/:car_id', async (req, res) => {
     console.error('Aktives-Fahrzeug-Setzen-Fehler:', error);
     res.status(500).json({ 
       error: 'Aktives Fahrzeug konnte nicht gesetzt werden',
+      details: error.message
+    });
+  }
+});
+
+// Audio-Geräte für ein Fahrzeug setzen
+router.put('/set-audio-devices/:car_id', async (req, res) => {
+  try {
+    const { car_id } = req.params;
+    const { audio_device_names } = req.body;
+    const userId = req.user.id;
+
+    // Validierung
+    if (!Array.isArray(audio_device_names)) {
+      return res.status(400).json({ error: 'audio_device_names muss ein Array sein' });
+    }
+
+    // Überprüfe ob das Fahrzeug dem Benutzer gehört
+    const car = await query(
+      'SELECT id FROM cars WHERE id = ? AND user_id = ?',
+      [car_id, userId]
+    );
+
+    if (car.length === 0) {
+      return res.status(404).json({ error: 'Fahrzeug nicht gefunden' });
+    }
+
+    // Aktualisiere Audio-Geräte-Namen
+    await query(
+      'UPDATE cars SET audio_device_names = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [JSON.stringify(audio_device_names), car_id]
+    );
+
+    // Hole das aktualisierte Fahrzeug zurück
+    const updatedCar = await query(
+      'SELECT * FROM cars WHERE id = ?',
+      [car_id]
+    );
+
+    res.json({
+      message: 'Audio-Geräte erfolgreich gesetzt',
+      car: updatedCar[0]
+    });
+
+  } catch (error) {
+    console.error('Audio-Geräte-Setzen-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Audio-Geräte konnten nicht gesetzt werden',
       details: error.message
     });
   }
