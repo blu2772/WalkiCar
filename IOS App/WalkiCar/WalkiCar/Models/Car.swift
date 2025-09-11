@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 struct Car: Codable, Identifiable {
     let id: Int
@@ -60,7 +61,21 @@ struct Car: Codable, Identifiable {
         year = try container.decodeIfPresent(Int.self, forKey: .year)
         color = try container.decodeIfPresent(String.self, forKey: .color)
         bluetoothIdentifier = try container.decodeIfPresent(String.self, forKey: .bluetoothIdentifier)
-        audioDeviceNames = try container.decodeIfPresent([String].self, forKey: .audioDeviceNames)
+        
+        // Flexible audio_device_names Dekodierung (Array oder JSON-String)
+        if let arrayValue = try? container.decode([String].self, forKey: .audioDeviceNames) {
+            audioDeviceNames = arrayValue
+        } else if let stringValue = try? container.decode(String.self, forKey: .audioDeviceNames) {
+            // Versuche JSON-String zu parsen
+            if let data = stringValue.data(using: .utf8),
+               let parsedArray = try? JSONDecoder().decode([String].self, from: data) {
+                audioDeviceNames = parsedArray
+            } else {
+                audioDeviceNames = nil
+            }
+        } else {
+            audioDeviceNames = nil
+        }
         
         // Flexible is_active Dekodierung (0/1 oder true/false)
         if let boolValue = try? container.decode(Bool.self, forKey: .isActive) {
@@ -149,6 +164,107 @@ struct CarUpdateResponse: Codable {
 
 struct GarageResponse: Codable {
     let cars: [Car]
+}
+
+// Auto mit Standort-Informationen
+struct CarWithLocation: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let brand: String?
+    let model: String?
+    let year: Int?
+    let color: String?
+    let audioDeviceNames: [String]?
+    let isActive: Bool
+    let createdAt: String?
+    let updatedAt: String?
+    let latitude: Double?
+    let longitude: Double?
+    let accuracy: Double?
+    let speed: Double?
+    let heading: Double?
+    let altitude: Double?
+    let locationTimestamp: String?
+    let status: String // "live", "parked", "offline"
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case brand
+        case model
+        case year
+        case color
+        case audioDeviceNames = "audio_device_names"
+        case isActive = "is_active"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case latitude
+        case longitude
+        case accuracy
+        case speed
+        case heading
+        case altitude
+        case locationTimestamp = "location_timestamp"
+        case status
+    }
+    
+    // Computed property für Anzeige
+    var displayName: String {
+        if let brand = brand, let model = model {
+            return "\(brand) \(model)"
+        } else if let brand = brand {
+            return brand
+        } else {
+            return name
+        }
+    }
+    
+    var yearDisplay: String {
+        if let year = year {
+            return "\(year)"
+        } else {
+            return ""
+        }
+    }
+    
+    var statusColor: String {
+        switch status {
+        case "live":
+            return "green"
+        case "parked":
+            return "orange"
+        case "offline":
+            return "gray"
+        default:
+            return "gray"
+        }
+    }
+    
+    var statusText: String {
+        switch status {
+        case "live":
+            return "Live"
+        case "parked":
+            return "Geparkt"
+        case "offline":
+            return "Offline"
+        default:
+            return "Unbekannt"
+        }
+    }
+    
+    var hasLocation: Bool {
+        return latitude != nil && longitude != nil
+    }
+    
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+}
+
+struct CarsWithLocationsResponse: Codable {
+    let cars: [CarWithLocation]
 }
 
 // Bluetooth-Gerät Modell

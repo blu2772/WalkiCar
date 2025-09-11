@@ -49,6 +49,57 @@ router.get('/garage', async (req, res) => {
   }
 });
 
+// Alle Fahrzeuge mit aktuellen Standorten abrufen (für Karte)
+router.get('/with-locations', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Alle Autos des Benutzers mit ihren aktuellen Standorten
+    const carsWithLocations = await query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.brand,
+        c.model,
+        c.year,
+        c.color,
+        c.audio_device_names,
+        c.is_active,
+        c.created_at,
+        c.updated_at,
+        l.latitude,
+        l.longitude,
+        l.accuracy,
+        l.speed,
+        l.heading,
+        l.altitude,
+        l.timestamp as location_timestamp,
+        CASE 
+          WHEN l.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 'live'
+          WHEN l.timestamp > DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 'parked'
+          ELSE 'offline'
+        END as status
+      FROM cars c
+      LEFT JOIN locations l ON c.id = l.car_id
+      WHERE c.user_id = ?
+      AND (l.id IS NULL OR l.id = (
+        SELECT MAX(l2.id) 
+        FROM locations l2 
+        WHERE l2.car_id = c.id
+      ))
+      ORDER BY c.is_active DESC, l.timestamp DESC
+    `, [userId]);
+
+    res.json({ cars: carsWithLocations });
+  } catch (error) {
+    console.error('Fahrzeuge-mit-Standorten-Abruf-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Fahrzeuge mit Standorten konnten nicht abgerufen werden',
+      details: error.message
+    });
+  }
+});
+
 // Neues Fahrzeug erstellen
 router.post('/create', async (req, res) => {
   try {

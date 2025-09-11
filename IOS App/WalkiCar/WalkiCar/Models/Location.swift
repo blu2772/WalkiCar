@@ -28,6 +28,53 @@ struct Location: Codable, Identifiable {
     let model: String?
     let color: String?
     
+    // Custom initializer für flexible latitude/longitude Dekodierung
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        userId = try container.decode(Int.self, forKey: .userId)
+        carId = try container.decodeIfPresent(Int.self, forKey: .carId)
+        
+        // Flexible latitude Dekodierung (Double oder String)
+        if let doubleValue = try? container.decode(Double.self, forKey: .latitude) {
+            latitude = doubleValue
+        } else if let stringValue = try? container.decode(String.self, forKey: .latitude),
+                  let parsedValue = Double(stringValue) {
+            latitude = parsedValue
+        } else {
+            throw DecodingError.typeMismatch(Double.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Could not decode latitude as Double or String"))
+        }
+        
+        // Flexible longitude Dekodierung (Double oder String)
+        if let doubleValue = try? container.decode(Double.self, forKey: .longitude) {
+            longitude = doubleValue
+        } else if let stringValue = try? container.decode(String.self, forKey: .longitude),
+                  let parsedValue = Double(stringValue) {
+            longitude = parsedValue
+        } else {
+            throw DecodingError.typeMismatch(Double.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Could not decode longitude as Double or String"))
+        }
+        
+        accuracy = try container.decodeIfPresent(Float.self, forKey: .accuracy)
+        speed = try container.decodeIfPresent(Float.self, forKey: .speed)
+        heading = try container.decodeIfPresent(Float.self, forKey: .heading)
+        altitude = try container.decodeIfPresent(Float.self, forKey: .altitude)
+        isLive = try container.decodeIfPresent(Bool.self, forKey: .isLive)
+        isParked = try container.decodeIfPresent(Bool.self, forKey: .isParked)
+        bluetoothConnected = try container.decodeIfPresent(Bool.self, forKey: .bluetoothConnected)
+        timestamp = try container.decode(String.self, forKey: .timestamp)
+        
+        username = try container.decodeIfPresent(String.self, forKey: .username)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        profilePictureUrl = try container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
+        
+        carName = try container.decodeIfPresent(String.self, forKey: .carName)
+        brand = try container.decodeIfPresent(String.self, forKey: .brand)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"

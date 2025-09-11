@@ -186,10 +186,16 @@ class LocationManager: NSObject, ObservableObject {
             print("📍 LocationManager: Kein aktueller Standort verfügbar")
             return
         }
-        
+
         // Verwende das aktive Auto, falls keine carId übergeben wurde
         let carIdToUse = carId ?? activeCarId
-        
+
+        // Nur Standort-Updates senden, wenn ein Auto aktiv ist
+        guard carIdToUse != nil else {
+            print("📍 LocationManager: Kein aktives Auto - kein Standort-Update")
+            return
+        }
+
         let request = LocationUpdateRequest(
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,

@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct WalkiCarApp: App {
     @StateObject private var authManager = AuthManager()
-    @StateObject private var garageManager = GarageManager()
+    @StateObject private var garageManager = GarageManager.shared
     @StateObject private var locationManager = LocationManager.shared
     @StateObject private var audioWatcher = CarAudioWatcher.shared
     

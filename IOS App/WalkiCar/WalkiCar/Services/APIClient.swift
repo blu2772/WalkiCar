@@ -222,6 +222,17 @@ class APIClient: ObservableObject {
         )
     }
     
+    func getCarsWithLocations() async throws -> CarsWithLocationsResponse {
+        print("🌐 APIClient: Lade Autos mit Standorten...")
+        return try await makeRequest(
+            endpoint: "/cars/with-locations",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: CarsWithLocationsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
     func createCar(_ request: CarCreateRequest) async throws -> CarCreateResponse {
         print("🌐 APIClient: Erstelle Fahrzeug: \(request.name)")
         return try await makeRequest(
@@ -255,12 +266,20 @@ class APIClient: ObservableObject {
     
     func setAudioDevices(carId: Int, audioDeviceNames: [String]) async throws -> Car {
         let request = ["audio_device_names": audioDeviceNames]
-        return try await makeRequest(
+        let response: [String: Any] = try await makeRequestDict(
             endpoint: "/cars/set-audio-devices/\(carId)",
             method: "PUT",
             body: request,
-            responseType: CarResponse.self
-        ).car
+            requiresAuth: true
+        )
+        
+        // Konvertiere die Antwort zu einem Car-Objekt
+        guard let carData = response["car"] as? [String: Any] else {
+            throw APIError.invalidResponse
+        }
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: carData)
+        return try JSONDecoder().decode(Car.self, from: jsonData)
     }
     
     func setActiveCar(carId: Int) async throws {
@@ -298,7 +317,7 @@ class APIClient: ObservableObject {
     
     func parkCar(_ request: ParkCarRequest) async throws {
         print("🌐 APIClient: Parke Fahrzeug ID: \(request.carId)")
-        let response: [String: String] = try await makeRequest(
+        _ = try await makeRequest(
             endpoint: "/locations/park",
             method: "POST",
             body: request,
@@ -320,7 +339,7 @@ class APIClient: ObservableObject {
     
     func updateLocationSettings(_ request: LocationSettingsRequest) async throws {
         print("🌐 APIClient: Aktualisiere Standort-Einstellungen")
-        let response: [String: String] = try await makeRequest(
+        _ = try await makeRequest(
             endpoint: "/locations/settings",
             method: "PUT",
             body: request,

@@ -4,13 +4,14 @@ import CoreLocation
 
 struct CarMapView: View {
     @StateObject private var locationManager = LocationManager.shared
-    @StateObject private var garageManager = GarageManager()
+    @ObservedObject private var garageManager = GarageManager.shared
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 52.5200, longitude: 13.4050), // Berlin
         span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
     )
     @State private var showingLocationSettings = false
     @State private var showingLocationHistory = false
+    @State private var showingCarList = false
     @State private var selectedCar: Car?
     @State private var updateTimer: Timer?
     
@@ -62,6 +63,17 @@ struct CarMapView: View {
                                 .foregroundColor(.white)
                                 .padding()
                                 .background(Color.blue)
+                                .clipShape(Circle())
+                        }
+                        
+                        // Car List Button
+                        Button(action: {
+                            showingCarList = true
+                        }) {
+                            Image(systemName: "car.fill")
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(Color.purple)
                                 .clipShape(Circle())
                         }
                         
@@ -152,6 +164,18 @@ struct CarMapView: View {
         .sheet(isPresented: $showingLocationHistory) {
             LocationHistoryView(selectedCar: $selectedCar)
         }
+        .sheet(isPresented: $showingCarList) {
+            CarListView { selectedCar in
+                if let coordinate = selectedCar.coordinate {
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        region = MKCoordinateRegion(
+                            center: coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        )
+                    }
+                }
+            }
+        }
         .onAppear {
             loadInitialData()
             startPeriodicUpdates()
@@ -209,6 +233,7 @@ struct CarMapView: View {
     private func loadInitialData() {
         locationManager.fetchLiveLocations()
         garageManager.loadGarage()
+        garageManager.loadCarsWithLocations()
     }
     
     private func startPeriodicUpdates() {
@@ -389,7 +414,7 @@ struct LocationSettingRow: View {
 // MARK: - Location History View
 
 struct LocationHistoryView: View {
-    @StateObject private var garageManager = GarageManager()
+    @ObservedObject private var garageManager = GarageManager.shared
     @Binding var selectedCar: Car?
     @Environment(\.dismiss) private var dismiss
     
@@ -434,6 +459,139 @@ struct LocationHistoryView: View {
         }
         .onAppear {
             garageManager.loadGarage()
+        }
+    }
+}
+
+// MARK: - Car List View
+
+struct CarListView: View {
+    @ObservedObject private var garageManager = GarageManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCar: CarWithLocation?
+    let onCarSelected: ((CarWithLocation) -> Void)?
+    
+    init(onCarSelected: ((CarWithLocation) -> Void)? = nil) {
+        self.onCarSelected = onCarSelected
+    }
+    
+    var body: some View {
+        NavigationView {
+            List {
+                if garageManager.isLoading {
+                    ProgressView("Lade Autos...")
+                        .frame(maxWidth: .infinity)
+                } else if garageManager.carsWithLocations.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "car.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        
+                        Text("Keine Autos gefunden")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        Text("Füge dein erstes Auto in der Garage hinzu")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    ForEach(garageManager.carsWithLocations) { car in
+                        CarListRow(car: car) {
+                            selectedCar = car
+                            onCarSelected?(car)
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Meine Autos")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fertig") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            garageManager.loadCarsWithLocations()
+        }
+    }
+}
+
+// MARK: - Car List Row
+
+struct CarListRow: View {
+    let car: CarWithLocation
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Status Indicator
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 12, height: 12)
+                
+                // Car Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(car.displayName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    HStack {
+                        Text(car.statusText)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(statusColor.opacity(0.2))
+                            .foregroundColor(statusColor)
+                            .clipShape(Capsule())
+                        
+                        if car.hasLocation {
+                            Text("📍 Standort verfügbar")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("❌ Kein Standort")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let year = car.year {
+                        Text("Baujahr: \(year)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                // Arrow
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var statusColor: Color {
+        switch car.status {
+        case "live":
+            return .green
+        case "parked":
+            return .orange
+        case "offline":
+            return .gray
+        default:
+            return .gray
         }
     }
 }

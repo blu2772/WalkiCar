@@ -81,15 +81,15 @@ router.post('/update', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /locations/live - Live-Standorte aller Freunde abrufen (vereinfacht)
+// GET /locations/live - Live-Standorte aller Freunde abrufen (mit Freunde-System)
 router.get('/live', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         console.log('📍 Getting live locations for user:', userId);
 
-        // Einfache Abfrage ohne komplexe JOINs
+        // Live-Standorte: Nur von Freunden (mit gegenseitiger Freundschaft)
         const liveLocations = await query(`
-            SELECT 
+            SELECT DISTINCT
                 l.id,
                 l.user_id,
                 l.car_id,
@@ -102,19 +102,63 @@ router.get('/live', authenticateToken, async (req, res) => {
                 l.timestamp,
                 u.username,
                 u.display_name,
-                u.profile_picture_url
+                u.profile_picture_url,
+                c.name as car_name,
+                c.brand,
+                c.model,
+                c.color
             FROM locations l
             JOIN users u ON l.user_id = u.id
-            WHERE l.timestamp > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            LEFT JOIN cars c ON l.car_id = c.id
+            JOIN friendships f ON (
+                (f.user_id = ? AND f.friend_id = l.user_id AND f.status = 'accepted') OR
+                (f.friend_id = ? AND f.user_id = l.user_id AND f.status = 'accepted')
+            )
+            WHERE l.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            ORDER BY l.timestamp DESC
+            LIMIT 100
+        `, [userId, userId]);
+
+        // Geparkte Standorte: Letzte bekannte Positionen von Freunden (älter als 5 Minuten)
+        const parkedLocations = await query(`
+            SELECT DISTINCT
+                l.id,
+                l.user_id,
+                l.car_id,
+                l.latitude,
+                l.longitude,
+                l.accuracy,
+                l.timestamp as parked_at,
+                u.username,
+                u.display_name,
+                u.profile_picture_url,
+                c.name as car_name,
+                c.brand,
+                c.model,
+                c.color
+            FROM locations l
+            JOIN users u ON l.user_id = u.id
+            LEFT JOIN cars c ON l.car_id = c.id
+            JOIN friendships f ON (
+                (f.user_id = ? AND f.friend_id = l.user_id AND f.status = 'accepted') OR
+                (f.friend_id = ? AND f.user_id = l.user_id AND f.status = 'accepted')
+            )
+            WHERE l.timestamp <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            AND l.id = (
+                SELECT MAX(l2.id) 
+                FROM locations l2 
+                WHERE l2.user_id = l.user_id 
+                AND l2.timestamp <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            )
             ORDER BY l.timestamp DESC
             LIMIT 50
-        `);
+        `, [userId, userId]);
 
-        console.log('📍 Found', liveLocations.length, 'recent locations');
+        console.log('📍 Found', liveLocations.length, 'live locations and', parkedLocations.length, 'parked locations');
 
         res.json({
             live_locations: liveLocations,
-            parked_locations: [],
+            parked_locations: parkedLocations,
             timestamp: new Date().toISOString()
         });
 

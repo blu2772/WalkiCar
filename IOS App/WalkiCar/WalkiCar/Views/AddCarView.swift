@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct AddCarView: View {
-    @ObservedObject var garageManager: GarageManager
+    @ObservedObject var garageManager = GarageManager.shared
+    @ObservedObject var audioWatcher: CarAudioWatcher
     @Environment(\.dismiss) private var dismiss
     
     @State private var name = ""
@@ -16,8 +17,8 @@ struct AddCarView: View {
     @State private var model = ""
     @State private var year = ""
     @State private var color = ""
-    @State private var selectedBluetoothDevice: BluetoothDevice?
-    @State private var showingBluetoothScan = false
+    @State private var selectedAudioDevices: Set<String> = []
+    @State private var showingAudioDeviceSelection = false
     
     private let colors = ["Schwarz", "Weiß", "Grau", "Rot", "Blau", "Grün", "Gelb", "Silber"]
     private let years = Array(1900...Calendar.current.component(.year, from: Date())).reversed()
@@ -98,19 +99,29 @@ struct AddCarView: View {
                                 }
                             }
                             
-                            // Bluetooth Device
+                            // Audio Devices
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Bluetooth-Gerät")
+                                Text("Audio-Geräte")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                                 
-                                Button(action: { showingBluetoothScan = true }) {
+                                Button(action: { showingAudioDeviceSelection = true }) {
                                     HStack {
-                                        Image(systemName: "bluetooth")
-                                            .foregroundColor(.blue)
+                                        Image(systemName: "speaker.wave.2")
+                                            .foregroundColor(.green)
                                         
-                                        Text(selectedBluetoothDevice?.name ?? "Bluetooth-Gerät auswählen")
-                                            .foregroundColor(selectedBluetoothDevice != nil ? .white : .gray)
+                                        if selectedAudioDevices.isEmpty {
+                                            Text("Audio-Geräte zuordnen")
+                                                .foregroundColor(.gray)
+                                        } else {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                ForEach(Array(selectedAudioDevices), id: \.self) { deviceName in
+                                                    Text(deviceName)
+                                                        .font(.system(size: 14))
+                                                        .foregroundColor(.white)
+                                                }
+                                            }
+                                        }
                                         
                                         Spacer()
                                         
@@ -122,6 +133,13 @@ struct AddCarView: View {
                                     .padding(.vertical, 12)
                                     .background(Color.gray.opacity(0.2))
                                     .cornerRadius(10)
+                                }
+                                
+                                if !selectedAudioDevices.isEmpty {
+                                    Text("\(selectedAudioDevices.count) Audio-Gerät(e) ausgewählt")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.green)
+                                        .padding(.top, 4)
                                 }
                             }
                         }
@@ -165,8 +183,26 @@ struct AddCarView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingBluetoothScan) {
-            BluetoothScanView(garageManager: garageManager, selectedDevice: $selectedBluetoothDevice)
+        .sheet(isPresented: $showingAudioDeviceSelection) {
+            AudioDeviceSelectionView(
+                audioWatcher: audioWatcher,
+                car: Car(
+                    id: 0,
+                    name: name.isEmpty ? "Neues Auto" : name,
+                    brand: brand.isEmpty ? nil : brand,
+                    model: model.isEmpty ? nil : model,
+                    year: Int(year),
+                    color: color.isEmpty ? nil : color,
+                    bluetoothIdentifier: nil,
+                    audioDeviceNames: Array(selectedAudioDevices),
+                    isActive: false,
+                    createdAt: nil,
+                    updatedAt: nil
+                ),
+                onDevicesSelected: { devices in
+                    selectedAudioDevices = Set(devices)
+                }
+            )
         }
         .preferredColorScheme(.dark)
     }
@@ -183,7 +219,8 @@ struct AddCarView: View {
             model: model.isEmpty ? nil : model.trimmingCharacters(in: .whitespacesAndNewlines),
             year: yearInt,
             color: color.isEmpty ? nil : color.trimmingCharacters(in: .whitespacesAndNewlines),
-            bluetoothIdentifier: selectedBluetoothDevice?.id
+            bluetoothIdentifier: nil,
+            audioDeviceNames: selectedAudioDevices.isEmpty ? nil : Array(selectedAudioDevices)
         )
         
         dismiss()
@@ -202,5 +239,5 @@ struct CarTextFieldStyle: TextFieldStyle {
 }
 
 #Preview {
-    AddCarView(garageManager: GarageManager())
+    AddCarView(audioWatcher: CarAudioWatcher.shared)
 }

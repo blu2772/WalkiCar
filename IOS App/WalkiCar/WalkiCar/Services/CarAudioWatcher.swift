@@ -91,6 +91,8 @@ class CarAudioWatcher: ObservableObject {
     }
     
     deinit {
-        stopMonitoring()
+        Task { @MainActor in
+            stopMonitoring()
+        }
     }
 }

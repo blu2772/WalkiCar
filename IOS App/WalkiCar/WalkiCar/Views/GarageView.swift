@@ -8,9 +8,9 @@
 import SwiftUI
 
 struct GarageView: View {
-    @StateObject private var garageManager = GarageManager()
+    @ObservedObject private var garageManager = GarageManager.shared
+    @StateObject private var audioWatcher = CarAudioWatcher.shared
     @State private var showingAddCar = false
-    @State private var showingBluetoothScan = false
     @State private var showingEditCar: Car? = nil
     
     var body: some View {
@@ -128,13 +128,10 @@ struct GarageView: View {
             .navigationBarHidden(true)
         }
         .sheet(isPresented: $showingAddCar) {
-            AddCarView(garageManager: garageManager)
-        }
-        .sheet(isPresented: $showingBluetoothScan) {
-            BluetoothScanView(garageManager: garageManager)
+            AddCarView(audioWatcher: audioWatcher)
         }
         .sheet(item: $showingEditCar) { car in
-            EditCarView(garageManager: garageManager, car: car)
+            EditCarView(car: car)
         }
         .onAppear {
             garageManager.loadGarage()
@@ -276,14 +273,15 @@ struct CarCardView: View {
 
 #Preview("CarCardView") {
     CarCardView(
-        car: Car(
+        car:         Car(
             id: 1,
             name: "Mein Auto",
             brand: "BMW",
             model: "X5",
             year: 2020,
             color: "Schwarz",
-            bluetoothIdentifier: "ABC123",
+            bluetoothIdentifier: nil,
+            audioDeviceNames: ["BMW 330e"],
             isActive: false,
             createdAt: "2025-01-01T00:00:00Z",
             updatedAt: "2025-01-01T00:00:00Z"
