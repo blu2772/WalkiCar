@@ -100,6 +100,65 @@ router.get('/with-locations', async (req, res) => {
   }
 });
 
+// Alle Fahrzeuge der Freunde mit aktuellen Standorten abrufen (für Auto-Liste)
+router.get('/friends-with-locations', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Alle Autos der Freunde mit ihren aktuellen Standorten
+    const friendsCarsWithLocations = await query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.brand,
+        c.model,
+        c.year,
+        c.color,
+        c.audio_device_names,
+        c.is_active,
+        c.created_at,
+        c.updated_at,
+        c.user_id,
+        l.latitude,
+        l.longitude,
+        l.accuracy,
+        l.speed,
+        l.heading,
+        l.altitude,
+        l.timestamp as location_timestamp,
+        u.username,
+        u.display_name,
+        u.profile_picture_url,
+        CASE 
+          WHEN l.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 'live'
+          WHEN l.timestamp > DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 'parked'
+          ELSE 'offline'
+        END as status
+      FROM cars c
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN locations l ON c.id = l.car_id
+      JOIN friendships f ON (
+        (f.user_id = ? AND f.friend_id = c.user_id AND f.status = 'accepted') OR
+        (f.friend_id = ? AND f.user_id = c.user_id AND f.status = 'accepted')
+      )
+      WHERE (l.id IS NULL OR l.id = (
+        SELECT MAX(l2.id) 
+        FROM locations l2 
+        WHERE l2.car_id = c.id
+      ))
+      ORDER BY c.is_active DESC, l.timestamp DESC
+    `, [userId, userId]);
+
+    res.json({ cars: friendsCarsWithLocations });
+  } catch (error) {
+    console.error('Freunde-Fahrzeuge-mit-Standorten-Abruf-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Freunde-Fahrzeuge mit Standorten konnten nicht abgerufen werden',
+      details: error.message
+    });
+  }
+});
+
 // Neues Fahrzeug erstellen
 router.post('/create', async (req, res) => {
   try {

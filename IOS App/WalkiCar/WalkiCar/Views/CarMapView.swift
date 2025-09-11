@@ -165,16 +165,30 @@ struct CarMapView: View {
             LocationHistoryView(selectedCar: $selectedCar)
         }
         .sheet(isPresented: $showingCarList) {
-            CarListView { selectedCar in
-                if let coordinate = selectedCar.coordinate {
-                    withAnimation(.easeInOut(duration: 1.0)) {
-                        region = MKCoordinateRegion(
-                            center: coordinate,
-                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                        )
+            CarListView(
+                onMyCarSelected: { selectedCar in
+                    // Center map on selected car
+                    if let coordinate = selectedCar.coordinate {
+                        withAnimation(.easeInOut(duration: 1.0)) {
+                            region = MKCoordinateRegion(
+                                center: coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                            )
+                        }
+                    }
+                },
+                onFriendCarSelected: { selectedCar in
+                    // Center map on selected friend car
+                    if let coordinate = selectedCar.coordinate {
+                        withAnimation(.easeInOut(duration: 1.0)) {
+                            region = MKCoordinateRegion(
+                                center: coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                            )
+                        }
                     }
                 }
-            }
+            )
         }
         .onAppear {
             loadInitialData()
@@ -234,6 +248,7 @@ struct CarMapView: View {
         locationManager.fetchLiveLocations()
         garageManager.loadGarage()
         garageManager.loadCarsWithLocations()
+        garageManager.loadFriendsCarsWithLocations()
     }
     
     private func startPeriodicUpdates() {
@@ -468,11 +483,14 @@ struct LocationHistoryView: View {
 struct CarListView: View {
     @ObservedObject private var garageManager = GarageManager.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedCar: CarWithLocation?
-    let onCarSelected: ((CarWithLocation) -> Void)?
+    @State private var selectedMyCar: CarWithLocation?
+    @State private var selectedFriendCar: FriendCarWithLocation?
+    let onMyCarSelected: ((CarWithLocation) -> Void)?
+    let onFriendCarSelected: ((FriendCarWithLocation) -> Void)?
     
-    init(onCarSelected: ((CarWithLocation) -> Void)? = nil) {
-        self.onCarSelected = onCarSelected
+    init(onMyCarSelected: ((CarWithLocation) -> Void)? = nil, onFriendCarSelected: ((FriendCarWithLocation) -> Void)? = nil) {
+        self.onMyCarSelected = onMyCarSelected
+        self.onFriendCarSelected = onFriendCarSelected
     }
     
     var body: some View {
@@ -481,7 +499,7 @@ struct CarListView: View {
                 if garageManager.isLoading {
                     ProgressView("Lade Autos...")
                         .frame(maxWidth: .infinity)
-                } else if garageManager.carsWithLocations.isEmpty {
+                } else if garageManager.carsWithLocations.isEmpty && garageManager.friendsCarsWithLocations.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "car.fill")
                             .font(.system(size: 50))
@@ -498,16 +516,34 @@ struct CarListView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                 } else {
-                    ForEach(garageManager.carsWithLocations) { car in
-                        CarListRow(car: car) {
-                            selectedCar = car
-                            onCarSelected?(car)
-                            dismiss()
+                    // Eigene Autos
+                    if !garageManager.carsWithLocations.isEmpty {
+                        Section("Meine Autos") {
+                            ForEach(garageManager.carsWithLocations) { car in
+                                CarListRow(car: car) {
+                                    selectedMyCar = car
+                                    onMyCarSelected?(car)
+                                    dismiss()
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Freunde-Autos
+                    if !garageManager.friendsCarsWithLocations.isEmpty {
+                        Section("Freunde-Autos") {
+                            ForEach(garageManager.friendsCarsWithLocations) { car in
+                                FriendCarListRow(car: car) {
+                                    selectedFriendCar = car
+                                    onFriendCarSelected?(car)
+                                    dismiss()
+                                }
+                            }
                         }
                     }
                 }
             }
-            .navigationTitle("Meine Autos")
+            .navigationTitle("Alle Autos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -519,6 +555,7 @@ struct CarListView: View {
         }
         .onAppear {
             garageManager.loadCarsWithLocations()
+            garageManager.loadFriendsCarsWithLocations()
         }
     }
 }
@@ -542,6 +579,83 @@ struct CarListRow: View {
                     Text(car.displayName)
                         .font(.headline)
                         .foregroundColor(.primary)
+                    
+                    HStack {
+                        Text(car.statusText)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(statusColor.opacity(0.2))
+                            .foregroundColor(statusColor)
+                            .clipShape(Capsule())
+                        
+                        if car.hasLocation {
+                            Text("📍 Standort verfügbar")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("❌ Kein Standort")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let year = car.year {
+                        Text("Baujahr: \(year)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                // Arrow
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var statusColor: Color {
+        switch car.status {
+        case "live":
+            return .green
+        case "parked":
+            return .orange
+        case "offline":
+            return .gray
+        default:
+            return .gray
+        }
+    }
+}
+
+// MARK: - Friend Car List Row
+
+struct FriendCarListRow: View {
+    let car: FriendCarWithLocation
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Status Indicator
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 12, height: 12)
+                
+                // Car Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(car.carDisplayName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text("von \(car.ownerDisplayName)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
                     HStack {
                         Text(car.statusText)

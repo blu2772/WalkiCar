@@ -267,6 +267,118 @@ struct CarsWithLocationsResponse: Codable {
     let cars: [CarWithLocation]
 }
 
+// Auto eines Freundes mit Standort-Informationen
+struct FriendCarWithLocation: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let brand: String?
+    let model: String?
+    let year: Int?
+    let color: String?
+    let audioDeviceNames: [String]?
+    let isActive: Bool
+    let createdAt: String?
+    let updatedAt: String?
+    let userId: Int
+    let latitude: Double?
+    let longitude: Double?
+    let accuracy: Double?
+    let speed: Double?
+    let heading: Double?
+    let altitude: Double?
+    let locationTimestamp: String?
+    let status: String // "live", "parked", "offline"
+    let username: String?
+    let displayName: String?
+    let profilePictureUrl: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case brand
+        case model
+        case year
+        case color
+        case audioDeviceNames = "audio_device_names"
+        case isActive = "is_active"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case userId = "user_id"
+        case latitude
+        case longitude
+        case accuracy
+        case speed
+        case heading
+        case altitude
+        case locationTimestamp = "location_timestamp"
+        case status
+        case username
+        case displayName = "display_name"
+        case profilePictureUrl = "profile_picture_url"
+    }
+    
+    var yearDisplay: String {
+        if let year = year {
+            return "\(year)"
+        } else {
+            return ""
+        }
+    }
+    
+    var statusColor: String {
+        switch status {
+        case "live":
+            return "green"
+        case "parked":
+            return "orange"
+        case "offline":
+            return "gray"
+        default:
+            return "gray"
+        }
+    }
+    
+    var statusText: String {
+        switch status {
+        case "live":
+            return "Live"
+        case "parked":
+            return "Geparkt"
+        case "offline":
+            return "Offline"
+        default:
+            return "Unbekannt"
+        }
+    }
+    
+    var hasLocation: Bool {
+        return latitude != nil && longitude != nil
+    }
+    
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+    
+    var ownerDisplayName: String {
+        return self.displayName ?? username ?? "Unbekannt"
+    }
+    
+    var carDisplayName: String {
+        if let brand = brand, let model = model {
+            return "\(brand) \(model)"
+        } else if let brand = brand {
+            return brand
+        } else {
+            return name
+        }
+    }
+}
+
+struct FriendsCarsWithLocationsResponse: Codable {
+    let cars: [FriendCarWithLocation]
+}
+
 // Bluetooth-Gerät Modell
 struct BluetoothDevice: Identifiable, Equatable {
     let id: String

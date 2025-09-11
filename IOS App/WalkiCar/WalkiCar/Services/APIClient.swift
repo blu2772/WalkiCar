@@ -233,6 +233,17 @@ class APIClient: ObservableObject {
         )
     }
     
+    func getFriendsCarsWithLocations() async throws -> FriendsCarsWithLocationsResponse {
+        print("🌐 APIClient: Lade Freunde-Autos mit Standorten...")
+        return try await makeRequest(
+            endpoint: "/cars/friends-with-locations",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: FriendsCarsWithLocationsResponse.self,
+            requiresAuth: true
+        )
+    }
+    
     func createCar(_ request: CarCreateRequest) async throws -> CarCreateResponse {
         print("🌐 APIClient: Erstelle Fahrzeug: \(request.name)")
         return try await makeRequest(

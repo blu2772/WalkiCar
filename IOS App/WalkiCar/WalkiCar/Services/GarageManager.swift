@@ -14,6 +14,7 @@ class GarageManager: NSObject, ObservableObject {
     
     @Published var cars: [Car] = []
     @Published var carsWithLocations: [CarWithLocation] = []
+    @Published var friendsCarsWithLocations: [FriendCarWithLocation] = []
     @Published var bluetoothDevices: [BluetoothDevice] = []
     @Published var isLoading = false
     @Published var isScanning = false
@@ -82,6 +83,33 @@ class GarageManager: NSObject, ObservableObject {
                     self.errorMessage = "Fehler beim Laden der Autos mit Standorten: \(error.localizedDescription)"
                     self.isLoading = false
                     print("❌ GarageManager: Fehler beim Laden der Autos mit Standorten: \(error)")
+                }
+            }
+        }
+    }
+    
+    func loadFriendsCarsWithLocations() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let response = try await apiClient.getFriendsCarsWithLocations()
+                await MainActor.run {
+                    self.friendsCarsWithLocations = response.cars
+                    self.isLoading = false
+                    
+                    print("🚗 GarageManager: Freunde-Autos mit Standorten geladen - \(self.friendsCarsWithLocations.count) Autos")
+                    for car in self.friendsCarsWithLocations {
+                        let locationInfo = car.hasLocation ? "Standort: \(car.latitude ?? 0), \(car.longitude ?? 0)" : "Kein Standort"
+                        print("🚗 GarageManager: Freunde-Auto '\(car.name)' von \(car.ownerDisplayName) - Status: \(car.statusText), \(locationInfo)")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Fehler beim Laden der Freunde-Autos mit Standorten: \(error.localizedDescription)"
+                    self.isLoading = false
+                    print("❌ GarageManager: Fehler beim Laden der Freunde-Autos mit Standorten: \(error)")
                 }
             }
         }
