@@ -126,7 +126,7 @@ router.get('/live', authenticateToken, async (req, res) => {
             LIMIT 100
         `, [userId, userId, userId]);
 
-        // Geparkte Standorte: Letzte bekannte Positionen von Freunden UND eigenen Standorten (älter als 5 Minuten)
+        // Geparkte Standorte: Nur Autos die NICHT live sind (älter als 5 Minuten)
         const parkedLocations = await query(`
             SELECT DISTINCT
                 l.id,
@@ -152,15 +152,25 @@ router.get('/live', authenticateToken, async (req, res) => {
             )
             WHERE l.timestamp <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
             AND (l.user_id = ? OR f.id IS NOT NULL)
+            AND l.car_id NOT IN (
+                SELECT DISTINCT l3.car_id 
+                FROM locations l3 
+                WHERE l3.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                AND (l3.user_id = ? OR EXISTS (
+                    SELECT 1 FROM friendships f3 WHERE 
+                    ((f3.user_id = ? AND f3.friend_id = l3.user_id AND f3.status = 'accepted') OR
+                     (f3.friend_id = ? AND f3.user_id = l3.user_id AND f3.status = 'accepted'))
+                ))
+            )
             AND l.id = (
                 SELECT MAX(l2.id) 
                 FROM locations l2 
-                WHERE l2.user_id = l.user_id 
+                WHERE l2.car_id = l.car_id 
                 AND l2.timestamp <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
             )
             ORDER BY l.timestamp DESC
             LIMIT 50
-        `, [userId, userId, userId]);
+        `, [userId, userId, userId, userId, userId, userId]);
 
         console.log('📍 Found', liveLocations.length, 'live locations and', parkedLocations.length, 'parked locations');
 
