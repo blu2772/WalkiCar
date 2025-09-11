@@ -87,7 +87,7 @@ router.get('/live', authenticateToken, async (req, res) => {
         const userId = req.user.id;
         console.log('📍 Getting live locations for user:', userId);
 
-        // Live-Standorte: Von Freunden UND eigenen Standorten
+        // Live-Standorte: Nur der neueste Standort pro Auto (von Freunden UND eigenen Standorten)
         const liveLocations = await query(`
             SELECT DISTINCT
                 l.id,
@@ -116,6 +116,12 @@ router.get('/live', authenticateToken, async (req, res) => {
             )
             WHERE l.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
             AND (l.user_id = ? OR f.id IS NOT NULL)
+            AND l.id = (
+                SELECT MAX(l2.id) 
+                FROM locations l2 
+                WHERE l2.car_id = l.car_id 
+                AND l2.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            )
             ORDER BY l.timestamp DESC
             LIMIT 100
         `, [userId, userId, userId]);
