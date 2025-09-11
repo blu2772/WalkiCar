@@ -87,7 +87,7 @@ router.get('/live', authenticateToken, async (req, res) => {
         const userId = req.user.id;
         console.log('📍 Getting live locations for user:', userId);
 
-        // Live-Standorte: Nur von Freunden (mit gegenseitiger Freundschaft)
+        // Live-Standorte: Von Freunden UND eigenen Standorten
         const liveLocations = await query(`
             SELECT DISTINCT
                 l.id,
@@ -110,16 +110,17 @@ router.get('/live', authenticateToken, async (req, res) => {
             FROM locations l
             JOIN users u ON l.user_id = u.id
             LEFT JOIN cars c ON l.car_id = c.id
-            JOIN friendships f ON (
+            LEFT JOIN friendships f ON (
                 (f.user_id = ? AND f.friend_id = l.user_id AND f.status = 'accepted') OR
                 (f.friend_id = ? AND f.user_id = l.user_id AND f.status = 'accepted')
             )
             WHERE l.timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            AND (l.user_id = ? OR f.id IS NOT NULL)
             ORDER BY l.timestamp DESC
             LIMIT 100
-        `, [userId, userId]);
+        `, [userId, userId, userId]);
 
-        // Geparkte Standorte: Letzte bekannte Positionen von Freunden (älter als 5 Minuten)
+        // Geparkte Standorte: Letzte bekannte Positionen von Freunden UND eigenen Standorten (älter als 5 Minuten)
         const parkedLocations = await query(`
             SELECT DISTINCT
                 l.id,
@@ -139,11 +140,12 @@ router.get('/live', authenticateToken, async (req, res) => {
             FROM locations l
             JOIN users u ON l.user_id = u.id
             LEFT JOIN cars c ON l.car_id = c.id
-            JOIN friendships f ON (
+            LEFT JOIN friendships f ON (
                 (f.user_id = ? AND f.friend_id = l.user_id AND f.status = 'accepted') OR
                 (f.friend_id = ? AND f.user_id = l.user_id AND f.status = 'accepted')
             )
             WHERE l.timestamp <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            AND (l.user_id = ? OR f.id IS NOT NULL)
             AND l.id = (
                 SELECT MAX(l2.id) 
                 FROM locations l2 
@@ -152,7 +154,7 @@ router.get('/live', authenticateToken, async (req, res) => {
             )
             ORDER BY l.timestamp DESC
             LIMIT 50
-        `, [userId, userId]);
+        `, [userId, userId, userId]);
 
         console.log('📍 Found', liveLocations.length, 'live locations and', parkedLocations.length, 'parked locations');
 

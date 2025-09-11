@@ -69,10 +69,23 @@ class GarageManager: NSObject, ObservableObject {
             do {
                 let response = try await apiClient.getCarsWithLocations()
                 await MainActor.run {
-                    self.carsWithLocations = response.cars
+                    // Dedupliziere Autos basierend auf car.id (behalte den neuesten Eintrag)
+                    let uniqueCars = Dictionary(grouping: response.cars) { $0.id }
+                        .compactMapValues { cars in
+                            cars.max { car1, car2 in
+                                // Sortiere nach location_timestamp (neuester zuerst)
+                                let timestamp1 = car1.locationTimestamp ?? ""
+                                let timestamp2 = car2.locationTimestamp ?? ""
+                                return timestamp1 < timestamp2
+                            }
+                        }
+                        .values
+                        .sorted { $0.id < $1.id }
+                    
+                    self.carsWithLocations = Array(uniqueCars)
                     self.isLoading = false
                     
-                    print("🚗 GarageManager: Autos mit Standorten geladen - \(self.carsWithLocations.count) Autos")
+                    print("🚗 GarageManager: Autos mit Standorten geladen - \(self.carsWithLocations.count) Autos (dedupliziert)")
                     for car in self.carsWithLocations {
                         let locationInfo = car.hasLocation ? "Standort: \(car.latitude ?? 0), \(car.longitude ?? 0)" : "Kein Standort"
                         print("🚗 GarageManager: Auto '\(car.name)' - Status: \(car.statusText), \(locationInfo)")
@@ -96,10 +109,23 @@ class GarageManager: NSObject, ObservableObject {
             do {
                 let response = try await apiClient.getFriendsCarsWithLocations()
                 await MainActor.run {
-                    self.friendsCarsWithLocations = response.cars
+                    // Dedupliziere Freunde-Autos basierend auf car.id (behalte den neuesten Eintrag)
+                    let uniqueFriendsCars = Dictionary(grouping: response.cars) { $0.id }
+                        .compactMapValues { cars in
+                            cars.max { car1, car2 in
+                                // Sortiere nach location_timestamp (neuester zuerst)
+                                let timestamp1 = car1.locationTimestamp ?? ""
+                                let timestamp2 = car2.locationTimestamp ?? ""
+                                return timestamp1 < timestamp2
+                            }
+                        }
+                        .values
+                        .sorted { $0.id < $1.id }
+                    
+                    self.friendsCarsWithLocations = Array(uniqueFriendsCars)
                     self.isLoading = false
                     
-                    print("🚗 GarageManager: Freunde-Autos mit Standorten geladen - \(self.friendsCarsWithLocations.count) Autos")
+                    print("🚗 GarageManager: Freunde-Autos mit Standorten geladen - \(self.friendsCarsWithLocations.count) Autos (dedupliziert)")
                     for car in self.friendsCarsWithLocations {
                         let locationInfo = car.hasLocation ? "Standort: \(car.latitude ?? 0), \(car.longitude ?? 0)" : "Kein Standort"
                         print("🚗 GarageManager: Freunde-Auto '\(car.name)' von \(car.ownerDisplayName) - Status: \(car.statusText), \(locationInfo)")

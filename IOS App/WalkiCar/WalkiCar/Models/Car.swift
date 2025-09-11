@@ -208,6 +208,81 @@ struct CarWithLocation: Codable, Identifiable {
         case status
     }
     
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        brand = try container.decodeIfPresent(String.self, forKey: .brand)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        
+        // Custom decoding für audioDeviceNames - kann String oder Array sein
+        if let audioDevicesString = try? container.decode(String.self, forKey: .audioDeviceNames) {
+            // Versuche JSON-String zu parsen
+            if let data = audioDevicesString.data(using: .utf8),
+               let audioDevices = try? JSONDecoder().decode([String].self, from: data) {
+                audioDeviceNames = audioDevices
+            } else {
+                audioDeviceNames = nil
+            }
+        } else if let audioDevicesArray = try? container.decode([String].self, forKey: .audioDeviceNames) {
+            audioDeviceNames = audioDevicesArray
+        } else {
+            audioDeviceNames = nil
+        }
+        
+        // Custom decoding für isActive - kann Number oder Bool sein
+        if let isActiveInt = try? container.decode(Int.self, forKey: .isActive) {
+            isActive = isActiveInt == 1
+        } else {
+            isActive = try container.decode(Bool.self, forKey: .isActive)
+        }
+        
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        
+        // Custom decoding für Koordinaten - können String oder Double sein
+        if let latitudeString = try? container.decode(String.self, forKey: .latitude) {
+            latitude = Double(latitudeString)
+        } else {
+            latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        }
+        
+        if let longitudeString = try? container.decode(String.self, forKey: .longitude) {
+            longitude = Double(longitudeString)
+        } else {
+            longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        }
+        
+        if let accuracyString = try? container.decode(String.self, forKey: .accuracy) {
+            accuracy = Double(accuracyString)
+        } else {
+            accuracy = try container.decodeIfPresent(Double.self, forKey: .accuracy)
+        }
+        
+        if let speedString = try? container.decode(String.self, forKey: .speed) {
+            speed = Double(speedString)
+        } else {
+            speed = try container.decodeIfPresent(Double.self, forKey: .speed)
+        }
+        
+        if let headingString = try? container.decode(String.self, forKey: .heading) {
+            heading = Double(headingString)
+        } else {
+            heading = try container.decodeIfPresent(Double.self, forKey: .heading)
+        }
+        
+        if let altitudeString = try? container.decode(String.self, forKey: .altitude) {
+            altitude = Double(altitudeString)
+        } else {
+            altitude = try container.decodeIfPresent(Double.self, forKey: .altitude)
+        }
+        locationTimestamp = try container.decodeIfPresent(String.self, forKey: .locationTimestamp)
+        status = try container.decode(String.self, forKey: .status)
+    }
+    
     // Computed property für Anzeige
     var displayName: String {
         if let brand = brand, let model = model {
@@ -315,6 +390,85 @@ struct FriendCarWithLocation: Codable, Identifiable {
         case username
         case displayName = "display_name"
         case profilePictureUrl = "profile_picture_url"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        brand = try container.decodeIfPresent(String.self, forKey: .brand)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        
+        // Custom decoding für audioDeviceNames - kann String oder Array sein
+        if let audioDevicesString = try? container.decode(String.self, forKey: .audioDeviceNames) {
+            // Versuche JSON-String zu parsen
+            if let data = audioDevicesString.data(using: .utf8),
+               let audioDevices = try? JSONDecoder().decode([String].self, from: data) {
+                audioDeviceNames = audioDevices
+            } else {
+                audioDeviceNames = nil
+            }
+        } else if let audioDevicesArray = try? container.decode([String].self, forKey: .audioDeviceNames) {
+            audioDeviceNames = audioDevicesArray
+        } else {
+            audioDeviceNames = nil
+        }
+        
+        // Custom decoding für isActive - kann Number oder Bool sein
+        if let isActiveInt = try? container.decode(Int.self, forKey: .isActive) {
+            isActive = isActiveInt == 1
+        } else {
+            isActive = try container.decode(Bool.self, forKey: .isActive)
+        }
+        
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        userId = try container.decode(Int.self, forKey: .userId)
+        
+        // Custom decoding für Koordinaten - können String oder Double sein
+        if let latitudeString = try? container.decode(String.self, forKey: .latitude) {
+            latitude = Double(latitudeString)
+        } else {
+            latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        }
+        
+        if let longitudeString = try? container.decode(String.self, forKey: .longitude) {
+            longitude = Double(longitudeString)
+        } else {
+            longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        }
+        
+        if let accuracyString = try? container.decode(String.self, forKey: .accuracy) {
+            accuracy = Double(accuracyString)
+        } else {
+            accuracy = try container.decodeIfPresent(Double.self, forKey: .accuracy)
+        }
+        
+        if let speedString = try? container.decode(String.self, forKey: .speed) {
+            speed = Double(speedString)
+        } else {
+            speed = try container.decodeIfPresent(Double.self, forKey: .speed)
+        }
+        
+        if let headingString = try? container.decode(String.self, forKey: .heading) {
+            heading = Double(headingString)
+        } else {
+            heading = try container.decodeIfPresent(Double.self, forKey: .heading)
+        }
+        
+        if let altitudeString = try? container.decode(String.self, forKey: .altitude) {
+            altitude = Double(altitudeString)
+        } else {
+            altitude = try container.decodeIfPresent(Double.self, forKey: .altitude)
+        }
+        locationTimestamp = try container.decodeIfPresent(String.self, forKey: .locationTimestamp)
+        status = try container.decode(String.self, forKey: .status)
+        username = try container.decodeIfPresent(String.self, forKey: .username)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        profilePictureUrl = try container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
     }
     
     var yearDisplay: String {
