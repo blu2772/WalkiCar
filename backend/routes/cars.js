@@ -77,7 +77,7 @@ router.post('/create', async (req, res) => {
     const result = await query(
       `INSERT INTO cars (user_id, name, brand, model, year, color, bluetooth_identifier, audio_device_names, is_active) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-      [userId, name, brand, model, year, color, bluetooth_identifier, JSON.stringify(audio_device_names)]
+      [userId, name, brand, model, year, color, bluetooth_identifier || null, JSON.stringify(audio_device_names)]
     );
 
     const carId = result.insertId;
