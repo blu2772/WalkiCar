@@ -117,8 +117,9 @@ router.post('/create', async (req, res) => {
     console.log('📝 Füge Ersteller hinzu:', addCreatorQuery, [groupId, userId]);
     await dbQuery(addCreatorQuery, [groupId, userId]);
     
-    // Freunde als Mitglieder hinzufügen
-    for (const friendId of friendIds) {
+    // Freunde als Mitglieder hinzufügen (Ersteller ausschließen)
+    const uniqueFriendIds = friendIds.filter(id => id !== userId);
+    for (const friendId of uniqueFriendIds) {
       const addMemberQuery = `
         INSERT INTO group_members (group_id, user_id, role)
         VALUES (?, ?, 'member')
