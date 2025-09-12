@@ -86,10 +86,13 @@ router.post('/park', authenticateToken, async (req, res) => {
     try {
         console.log('🅿️ Park Request:', req.body);
         
-        const { carId } = req.body;
+        // Unterstütze sowohl carId als auch car_id für Kompatibilität
+        const { carId, car_id } = req.body;
         const userId = req.user.id;
         
-        if (!carId) {
+        const actualCarId = carId || car_id;
+        
+        if (!actualCarId) {
             return res.status(400).json({
                 error: 'Auto-ID ist erforderlich'
             });
@@ -98,7 +101,7 @@ router.post('/park', authenticateToken, async (req, res) => {
         // Prüfe ob Auto dem Benutzer gehört
         const carCheck = await query(
             'SELECT id FROM cars WHERE id = ? AND user_id = ?',
-            [carId, userId]
+            [actualCarId, userId]
         );
         
         if (carCheck.length === 0) {
@@ -113,7 +116,7 @@ router.post('/park', authenticateToken, async (req, res) => {
             `INSERT INTO locations 
              (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, carId, null, null, null, null, null, null]
+            [userId, actualCarId, null, null, null, null, null, null]
         );
         
         console.log('✅ Auto geparkt mit Location ID:', parkResult.insertId);
@@ -240,41 +243,5 @@ router.get('/live', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /locations/park - Fahrzeug als geparkt markieren (vereinfacht)
-router.post('/park', authenticateToken, async (req, res) => {
-    try {
-        const { car_id } = req.body;
-        const userId = req.user.id;
-
-        if (!car_id) {
-            return res.status(400).json({
-                error: 'Fahrzeug-ID ist erforderlich'
-            });
-        }
-
-        // Prüfe ob Auto dem Benutzer gehört
-        const carCheck = await query(
-            'SELECT id FROM cars WHERE id = ? AND user_id = ?',
-            [car_id, userId]
-        );
-        if (carCheck.length === 0) {
-            return res.status(404).json({
-                error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
-            });
-        }
-
-        res.json({
-            message: 'Fahrzeug erfolgreich als geparkt markiert',
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error('❌ Parken-Fehler:', error);
-        res.status(500).json({
-            error: 'Fahrzeug konnte nicht als geparkt markiert werden',
-            details: error.message
-        });
-    }
-});
 
 module.exports = router;
