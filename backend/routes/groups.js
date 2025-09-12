@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { query: dbQuery, getConnection } = require('../config/database');
 
 // Alle Gruppen des Benutzers abrufen
 router.get('/list', async (req, res) => {
@@ -22,7 +22,7 @@ router.get('/list', async (req, res) => {
       ORDER BY g.created_at DESC
     `;
     
-    const [groups] = await db.execute(query, [userId]);
+    const groups = await dbQuery(query, [userId]);
     
     // Für jede Gruppe die Mitglieder laden
     for (let group of groups) {
@@ -37,7 +37,7 @@ router.get('/list', async (req, res) => {
         ORDER BY gm.joined_at ASC
       `;
       
-      const [members] = await db.execute(membersQuery, [group.id, group.id]);
+      const members = await dbQuery(membersQuery, [group.id, group.id]);
       group.members = members;
     }
     
@@ -85,7 +85,7 @@ router.post('/create', async (req, res) => {
     if (friendIds.length > 0) {
       const placeholders = friendIds.map(() => '?').join(',');
       const checkFriendsQuery = `SELECT id FROM users WHERE id IN (${placeholders})`;
-      const [existingFriends] = await db.execute(checkFriendsQuery, friendIds);
+      const existingFriends = await dbQuery(checkFriendsQuery, friendIds);
       
       if (existingFriends.length !== friendIds.length) {
         const existingIds = existingFriends.map(f => f.id);
@@ -104,7 +104,7 @@ router.post('/create', async (req, res) => {
     `;
     
     console.log('📝 Erstelle Gruppe mit Query:', createGroupQuery, [name, description, userId]);
-    const [result] = await db.execute(createGroupQuery, [name, description, userId]);
+    const result = await dbQuery(createGroupQuery, [name, description, userId]);
     const groupId = result.insertId;
     
     console.log('✅ Gruppe erstellt mit ID:', groupId);
@@ -115,7 +115,7 @@ router.post('/create', async (req, res) => {
       VALUES (?, ?, 'admin')
     `;
     console.log('📝 Füge Ersteller hinzu:', addCreatorQuery, [groupId, userId]);
-    await db.execute(addCreatorQuery, [groupId, userId]);
+    await dbQuery(addCreatorQuery, [groupId, userId]);
     
     // Freunde als Mitglieder hinzufügen
     for (const friendId of friendIds) {
@@ -124,7 +124,7 @@ router.post('/create', async (req, res) => {
         VALUES (?, ?, 'member')
       `;
       console.log('📝 Füge Freund hinzu:', addMemberQuery, [groupId, friendId]);
-      await db.execute(addMemberQuery, [groupId, friendId]);
+      await dbQuery(addMemberQuery, [groupId, friendId]);
     }
     
     console.log('✅ Gruppe erfolgreich erstellt:', groupId);
@@ -192,7 +192,7 @@ router.post('/:groupId/leave', async (req, res) => {
       SELECT role FROM group_members 
       WHERE group_id = ? AND user_id = ?
     `;
-    const [members] = await db.execute(checkMemberQuery, [groupId, userId]);
+    const members = await dbQuery(checkMemberQuery, [groupId, userId]);
     
     if (members.length === 0) {
       return res.status(403).json({ error: 'Du bist kein Mitglied dieser Gruppe' });
@@ -204,24 +204,24 @@ router.post('/:groupId/leave', async (req, res) => {
       SET is_active = false, ended_at = NOW()
       WHERE group_id = ? AND user_id = ? AND is_active = true
     `;
-    await db.execute(endVoiceSessionQuery, [groupId, userId]);
+    await dbQuery(endVoiceSessionQuery, [groupId, userId]);
     
     // Aus Gruppe entfernen
     const leaveGroupQuery = `
       DELETE FROM group_members 
       WHERE group_id = ? AND user_id = ?
     `;
-    await db.execute(leaveGroupQuery, [groupId, userId]);
+    await dbQuery(leaveGroupQuery, [groupId, userId]);
     
     // Prüfen ob Gruppe leer ist und löschen
     const checkEmptyQuery = `
       SELECT COUNT(*) as member_count FROM group_members WHERE group_id = ?
     `;
-    const [countResult] = await db.execute(checkEmptyQuery, [groupId]);
+    const countResult = await dbQuery(checkEmptyQuery, [groupId]);
     
     if (countResult[0].member_count === 0) {
       const deleteGroupQuery = `DELETE FROM groups WHERE id = ?`;
-      await db.execute(deleteGroupQuery, [groupId]);
+      await dbQuery(deleteGroupQuery, [groupId]);
     }
     
     res.json({ success: true, message: 'Gruppe erfolgreich verlassen' });
@@ -242,7 +242,7 @@ router.post('/:groupId/voice/join', async (req, res) => {
       SELECT role FROM group_members 
       WHERE group_id = ? AND user_id = ?
     `;
-    const [members] = await db.execute(checkMemberQuery, [groupId, userId]);
+    const members = await dbQuery(checkMemberQuery, [groupId, userId]);
     
     if (members.length === 0) {
       return res.status(403).json({ error: 'Du bist kein Mitglied dieser Gruppe' });
@@ -253,7 +253,7 @@ router.post('/:groupId/voice/join', async (req, res) => {
       SELECT id FROM voice_sessions 
       WHERE group_id = ? AND user_id = ? AND is_active = true
     `;
-    const [existingSessions] = await db.execute(checkSessionQuery, [groupId, userId]);
+    const existingSessions = await dbQuery(checkSessionQuery, [groupId, userId]);
     
     if (existingSessions.length > 0) {
       return res.json({ success: true, message: 'Bereits im Voice Chat' });
@@ -264,7 +264,7 @@ router.post('/:groupId/voice/join', async (req, res) => {
       INSERT INTO voice_sessions (group_id, user_id, session_type, is_active)
       VALUES (?, ?, 'group', true)
     `;
-    await db.execute(createSessionQuery, [groupId, userId]);
+    await dbQuery(createSessionQuery, [groupId, userId]);
     
     res.json({ success: true, message: 'Voice Chat beigetreten' });
   } catch (error) {
@@ -285,7 +285,7 @@ router.post('/:groupId/voice/leave', async (req, res) => {
       SET is_active = false, ended_at = NOW()
       WHERE group_id = ? AND user_id = ? AND is_active = true
     `;
-    const [result] = await db.execute(endSessionQuery, [groupId, userId]);
+    const result = await dbQuery(endSessionQuery, [groupId, userId]);
     
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Keine aktive Voice Session gefunden' });
@@ -312,7 +312,7 @@ router.get('/:groupId/voice/status', async (req, res) => {
       ORDER BY vs.started_at ASC
     `;
     
-    const [participants] = await db.execute(query, [groupId]);
+    const participants = await dbQuery(query, [groupId]);
     
     res.json({ 
       participants,
