@@ -129,7 +129,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.2',
+    version: '1.0.3',
     socketAuth: 'DISABLED_FOR_TESTING'
   });
 });
@@ -148,6 +148,7 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
   console.log('🔌 Socket.IO: Benutzer verbunden:', socket.id, 'User:', socket.user?.username);
+  console.log('🔌 Socket.IO: Server Version 1.0.2 - Authentifizierung DEAKTIVIERT');
   
   // Benutzer-Raum beitreten
   socket.on('join_user_room', async (data) => {
