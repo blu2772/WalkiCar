@@ -129,7 +129,24 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.2'
+    version: '1.0.2',
+    server: 'WalkiCar Backend',
+    socketio_enabled: true,
+    debug_info: {
+      node_version: process.version,
+      uptime: process.uptime(),
+      memory_usage: process.memoryUsage()
+    }
+  });
+});
+
+// Debug endpoint für Socket.IO
+app.get('/api/debug/socket', (req, res) => {
+  res.json({
+    socketio_configured: true,
+    cors_origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+    server_port: process.env.PORT || 3000,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -153,9 +170,12 @@ io.use(async (socket, next) => {
       socket.handshake.query.token ? 'query' : 
       socket.handshake.headers.authorization ? 'header' : 'keine');
     
+    // Temporär: Erlaube Verbindungen ohne Token für Debugging
     if (!token) {
-      console.log('❌ Socket.IO Auth: Kein Token vorhanden');
-      return next(new Error('Authentication error'));
+      console.log('⚠️ Socket.IO Auth: Kein Token vorhanden - erlaube trotzdem für Debugging');
+      socket.userId = 'debug';
+      socket.user = { username: 'debug', id: 'debug' };
+      return next();
     }
 
     // JWT Token verifizieren
@@ -545,7 +565,9 @@ const startServer = async () => {
     server.listen(PORT, () => {
       const protocol = httpsOptions ? 'https' : 'http';
       console.log(`🚗 WalkiCar Backend läuft auf ${protocol}://localhost:${PORT}`);
+      console.log(`🔌 Socket.IO läuft auf dem gleichen Port: ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔗 Socket.IO CORS Origin: ${process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000"}`);
       if (httpsOptions) {
         console.log('🔒 HTTPS aktiviert');
       } else {
