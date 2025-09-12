@@ -310,7 +310,9 @@ router.post('/:groupId/voice/join', async (req, res) => {
     // Sende WebSocket Event an alle Gruppenmitglieder
     const io = req.app.get('io');
     if (io) {
+      console.log(`🎤 Sende user_joined_voice_chat Event für Gruppe ${groupId} an ${groupMembers.length} Mitglieder`);
       groupMembers.forEach(member => {
+        console.log(`🎤 Sende Event an user_${member.user_id}`);
         io.to(`user_${member.user_id}`).emit('user_joined_voice_chat', {
           groupId: parseInt(groupId),
           userId: userId,
@@ -318,6 +320,8 @@ router.post('/:groupId/voice/join', async (req, res) => {
           displayName: req.user.display_name
         });
       });
+    } else {
+      console.log('❌ Socket.IO nicht verfügbar für user_joined_voice_chat Event');
     }
     
     res.json({ success: true, message: 'Voice Chat beigetreten' });
@@ -383,7 +387,9 @@ router.post('/:groupId/voice/leave', async (req, res) => {
     // Sende WebSocket Event an alle Gruppenmitglieder
     const io = req.app.get('io');
     if (io) {
+      console.log(`🎤 Sende user_left_voice_chat Event für Gruppe ${groupId} an ${groupMembers.length} Mitglieder`);
       groupMembers.forEach(member => {
+        console.log(`🎤 Sende Event an user_${member.user_id}`);
         io.to(`user_${member.user_id}`).emit('user_left_voice_chat', {
           groupId: parseInt(groupId),
           userId: userId,
@@ -391,6 +397,8 @@ router.post('/:groupId/voice/leave', async (req, res) => {
           displayName: req.user.display_name
         });
       });
+    } else {
+      console.log('❌ Socket.IO nicht verfügbar für user_left_voice_chat Event');
     }
     
     res.json({ success: true, message: 'Voice Chat verlassen' });

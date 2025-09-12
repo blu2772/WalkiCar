@@ -378,9 +378,45 @@ io.on('connection', (socket) => {
       
       // Join user-specific room for direct communication
       socket.join(`user_${userId}`);
-      console.log(`User ${socket.id} joined user room for user ${userId}`);
+      console.log(`🔌 User ${socket.id} joined user room for user ${userId}`);
     } catch (error) {
-      console.error('Error joining user room:', error);
+      console.error('❌ Error joining user room:', error);
+    }
+  });
+  
+  socket.on('join_group_room', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Join group-specific room for group communication
+      socket.join(`group_${groupId}`);
+      console.log(`👥 User ${socket.id} joined group room for group ${groupId}`);
+    } catch (error) {
+      console.error('❌ Error joining group room:', error);
+    }
+  });
+  
+  socket.on('join_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Join voice chat room
+      socket.join(`voice_chat_${groupId}`);
+      console.log(`🎤 User ${socket.id} joined voice chat room for group ${groupId}`);
+    } catch (error) {
+      console.error('❌ Error joining voice chat room:', error);
+    }
+  });
+  
+  socket.on('leave_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Leave voice chat room
+      socket.leave(`voice_chat_${groupId}`);
+      console.log(`🎤 User ${socket.id} left voice chat room for group ${groupId}`);
+    } catch (error) {
+      console.error('❌ Error leaving voice chat room:', error);
     }
   });
 });

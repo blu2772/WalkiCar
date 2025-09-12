@@ -315,10 +315,16 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         // Send audio frame to all active audio tracks
         for (userId, audioTrack) in audioTracks {
             if isMicrophoneEnabled {
-                // In a real implementation, you would use WebRTC's audio processing pipeline
-                // For now, we'll just log that audio is being processed
-                print("🎤 WebRTCAudioEngine: Audio Frame gesendet an User \(userId)")
+                // Audio-Daten werden automatisch über WebRTC übertragen
+                // Die RTCAudioTrack kümmert sich um die Übertragung
+                print("🎤 WebRTCAudioEngine: Audio aktiv für User \(userId) - Level: \(String(format: "%.2f", audioLevel))")
             }
+        }
+        
+        // Update audio level for UI
+        let audioLevel = calculateAudioLevel(buffer: buffer)
+        DispatchQueue.main.async {
+            self.audioLevel = audioLevel
         }
     }
     

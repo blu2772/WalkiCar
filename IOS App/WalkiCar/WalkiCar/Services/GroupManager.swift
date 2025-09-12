@@ -34,6 +34,14 @@ class GroupManager: ObservableObject {
     
     init() {
         setupWebSocketListeners()
+        
+        // WebSocket-Verbindung herstellen
+        webSocketManager.connect()
+        
+        // Benutzer-Raum beitreten wenn eingeloggt
+        if let userId = AuthManager.shared.currentUser?.id {
+            webSocketManager.joinUserRoom(userId: userId)
+        }
     }
     
     // MARK: - Group Management
@@ -124,8 +132,15 @@ class GroupManager: ObservableObject {
                         // Voice Chat Status aktualisieren
                         self.updateGroupVoiceChatStatus(groupId: groupId, isActive: true)
                         
-                        // WebSocket Room beitreten
+                        // WebSocket Rooms beitreten
                         if let userId = AuthManager.shared.currentUser?.id {
+                            // Benutzer-Raum beitreten (falls noch nicht geschehen)
+                            self.webSocketManager.joinUserRoom(userId: userId)
+                            
+                            // Gruppen-Raum beitreten
+                            self.webSocketManager.joinGroupRoom(userId: userId, groupId: groupId)
+                            
+                            // Voice Chat beitreten
                             self.webSocketManager.joinGroupVoiceChat(userId: userId, groupId: groupId)
                             
                             // WebRTC Voice Chat starten

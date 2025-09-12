@@ -20,6 +20,10 @@ class APIClient: ObservableObject {
     
     // MARK: - Authentication
     
+    func getAuthToken() -> String? {
+        return authToken
+    }
+    
     func signInWithApple(appleId: String, email: String) async throws -> AuthResponse {
         let request = LoginRequest(appleId: appleId, email: email)
         return try await makeRequest(

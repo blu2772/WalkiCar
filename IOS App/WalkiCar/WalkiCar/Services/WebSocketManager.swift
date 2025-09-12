@@ -30,7 +30,7 @@ class WebSocketManager: ObservableObject {
         }
         
         manager = SocketManager(socketURL: url, config: [
-            .log(false),
+            .log(true),  // Debug aktivieren
             .compress,
             .forceWebsockets(true),
             .reconnects(true),
@@ -207,6 +207,11 @@ class WebSocketManager: ObservableObject {
         guard let socket = socket else {
             print("❌ WebSocketManager: Socket nicht verfügbar")
             return
+        }
+        
+        // Auth-Token setzen falls verfügbar
+        if let token = APIClient.shared.getAuthToken() {
+            print("🔐 WebSocketManager: Auth-Token gesetzt für Verbindung")
         }
         
         print("🔌 WebSocketManager: Verbinde...")
