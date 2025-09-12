@@ -52,16 +52,23 @@ router.get('/list', async (req, res) => {
     if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
     if (error.sql) errorDetails.sql = error.sql;
     if (error.errno) errorDetails.errno = error.errno;
+    if (error.sqlState) errorDetails.sqlState = error.sqlState;
     
+    // Spezifische Fehlermeldungen
     if (error.code === 'ECONNREFUSED') {
       errorMessage = 'Datenbankverbindung fehlgeschlagen';
     } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
       errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    } else if (error.code === 'ER_NO_SUCH_TABLE') {
+      errorMessage = 'Datenbanktabelle existiert nicht';
     }
     
     res.status(500).json({ 
       error: errorMessage,
-      details: errorDetails
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -227,8 +234,35 @@ router.post('/:groupId/leave', async (req, res) => {
     
     res.json({ success: true, message: 'Gruppe erfolgreich verlassen' });
   } catch (error) {
-    console.error('Fehler beim Verlassen der Gruppe:', error);
-    res.status(500).json({ error: 'Fehler beim Verlassen der Gruppe' });
+    console.error('❌ Fehler beim Verlassen der Gruppe:', error);
+    
+    let errorMessage = 'Fehler beim Verlassen der Gruppe';
+    let errorDetails = {};
+    
+    if (error.code) errorDetails.code = error.code;
+    if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
+    if (error.sql) errorDetails.sql = error.sql;
+    if (error.errno) errorDetails.errno = error.errno;
+    if (error.sqlState) errorDetails.sqlState = error.sqlState;
+    
+    // Spezifische Fehlermeldungen
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    } else if (error.code === 'ER_NO_SUCH_TABLE') {
+      errorMessage = 'Datenbanktabelle existiert nicht';
+    } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Referenzierter Datensatz existiert nicht';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -269,8 +303,37 @@ router.post('/:groupId/voice/join', async (req, res) => {
     
     res.json({ success: true, message: 'Voice Chat beigetreten' });
   } catch (error) {
-    console.error('Fehler beim Beitreten zum Voice Chat:', error);
-    res.status(500).json({ error: 'Fehler beim Beitreten zum Voice Chat' });
+    console.error('❌ Fehler beim Beitreten zum Voice Chat:', error);
+    
+    let errorMessage = 'Fehler beim Beitreten zum Voice Chat';
+    let errorDetails = {};
+    
+    if (error.code) errorDetails.code = error.code;
+    if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
+    if (error.sql) errorDetails.sql = error.sql;
+    if (error.errno) errorDetails.errno = error.errno;
+    if (error.sqlState) errorDetails.sqlState = error.sqlState;
+    
+    // Spezifische Fehlermeldungen
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    } else if (error.code === 'ER_NO_SUCH_TABLE') {
+      errorMessage = 'Datenbanktabelle existiert nicht';
+    } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Referenzierter Datensatz existiert nicht';
+    } else if (error.code === 'ER_DUP_ENTRY') {
+      errorMessage = 'Voice Chat Session bereits vorhanden';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -294,8 +357,35 @@ router.post('/:groupId/voice/leave', async (req, res) => {
     
     res.json({ success: true, message: 'Voice Chat verlassen' });
   } catch (error) {
-    console.error('Fehler beim Verlassen des Voice Chats:', error);
-    res.status(500).json({ error: 'Fehler beim Verlassen des Voice Chats' });
+    console.error('❌ Fehler beim Verlassen des Voice Chats:', error);
+    
+    let errorMessage = 'Fehler beim Verlassen des Voice Chats';
+    let errorDetails = {};
+    
+    if (error.code) errorDetails.code = error.code;
+    if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
+    if (error.sql) errorDetails.sql = error.sql;
+    if (error.errno) errorDetails.errno = error.errno;
+    if (error.sqlState) errorDetails.sqlState = error.sqlState;
+    
+    // Spezifische Fehlermeldungen
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    } else if (error.code === 'ER_NO_SUCH_TABLE') {
+      errorMessage = 'Datenbanktabelle existiert nicht';
+    } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Referenzierter Datensatz existiert nicht';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -321,8 +411,35 @@ router.get('/:groupId/voice/status', async (req, res) => {
       participantCount: participants.length
     });
   } catch (error) {
-    console.error('Fehler beim Abrufen des Voice Chat Status:', error);
-    res.status(500).json({ error: 'Fehler beim Abrufen des Voice Chat Status' });
+    console.error('❌ Fehler beim Abrufen des Voice Chat Status:', error);
+    
+    let errorMessage = 'Fehler beim Abrufen des Voice Chat Status';
+    let errorDetails = {};
+    
+    if (error.code) errorDetails.code = error.code;
+    if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
+    if (error.sql) errorDetails.sql = error.sql;
+    if (error.errno) errorDetails.errno = error.errno;
+    if (error.sqlState) errorDetails.sqlState = error.sqlState;
+    
+    // Spezifische Fehlermeldungen
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    } else if (error.code === 'ER_NO_SUCH_TABLE') {
+      errorMessage = 'Datenbanktabelle existiert nicht';
+    } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Referenzierter Datensatz existiert nicht';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
