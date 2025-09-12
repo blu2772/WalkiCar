@@ -129,47 +129,26 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.1',
+    socketAuth: 'Updated'
   });
 });
 
-// Socket.IO connection handling
+// Socket.IO connection handling - Vereinfachte Version
 io.use(async (socket, next) => {
   try {
-    console.log('🔐 Socket.IO Auth: Neue Verbindung von:', socket.handshake.address);
-    console.log('🔐 Socket.IO Auth: Handshake Query:', socket.handshake.query);
-    console.log('🔐 Socket.IO Auth: Handshake Auth:', socket.handshake.auth);
-    console.log('🔐 Socket.IO Auth: Handshake Headers:', socket.handshake.headers);
-    
-    // Token aus verschiedenen Quellen versuchen zu lesen
-    let token = socket.handshake.auth.token || 
-                socket.handshake.query.token || 
-                socket.handshake.headers.authorization?.replace('Bearer ', '');
-    
-    console.log('🔐 Socket.IO Auth: Token empfangen:', token ? 'Ja' : 'Nein');
-    console.log('🔐 Socket.IO Auth: Token-Quelle:', 
-      socket.handshake.auth.token ? 'auth' : 
-      socket.handshake.query.token ? 'query' : 
-      socket.handshake.headers.authorization ? 'header' : 'keine');
+    // Token aus Query-Parametern lesen (wie von iOS-App gesendet)
+    const token = socket.handshake.query.token;
     
     if (!token) {
-      console.log('❌ Socket.IO Auth: Kein Token vorhanden');
-      console.log('❌ Socket.IO Auth: Verfügbare Daten:', {
-        auth: socket.handshake.auth,
-        query: socket.handshake.query,
-        headers: socket.handshake.headers
-      });
+      console.log('❌ Socket.IO: Kein Token in Query-Parametern');
       return next(new Error('Authentication error'));
     }
 
     // JWT Token verifizieren
     const jwt = require('jsonwebtoken');
-    console.log('🔐 Socket.IO Auth: Token zum Verifizieren:', token.substring(0, 20) + '...');
-    console.log('🔐 Socket.IO Auth: JWT_SECRET vorhanden:', process.env.JWT_SECRET ? 'Ja' : 'Nein');
-    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Socket.IO Auth: Token verifiziert für User ID:', decoded.userId);
-
+    
     // Benutzer in der Datenbank überprüfen
     const { query } = require('./config/database');
     const user = await query(
@@ -178,23 +157,18 @@ io.use(async (socket, next) => {
     );
 
     if (user.length === 0) {
-      console.log('❌ Socket.IO Auth: Benutzer nicht gefunden oder inaktiv');
+      console.log('❌ Socket.IO: Benutzer nicht gefunden');
       return next(new Error('Authentication error'));
     }
 
     // Benutzer-Daten an Socket anhängen
     socket.userId = decoded.userId;
     socket.user = user[0];
-    console.log('✅ Socket.IO Auth: Benutzer authentifiziert:', socket.user.username);
+    console.log('✅ Socket.IO: Benutzer authentifiziert:', socket.user.username);
     
     next();
   } catch (error) {
-    console.log('❌ Socket.IO Auth: Fehler:', error.message);
-    if (error.name === 'TokenExpiredError') {
-      return next(new Error('Token expired'));
-    } else if (error.name === 'JsonWebTokenError') {
-      return next(new Error('Invalid token'));
-    }
+    console.log('❌ Socket.IO Auth Fehler:', error.message);
     return next(new Error('Authentication error'));
   }
 });
