@@ -51,20 +51,10 @@ router.get('/list', async (req, res) => {
 // Neue Gruppe erstellen
 router.post('/create', async (req, res) => {
   try {
-    console.log('🔍 Debug: Gruppen-Erstellung gestartet');
-    console.log('🔍 Debug: req.user:', req.user);
-    console.log('🔍 Debug: req.body:', req.body);
-    
     const userId = req.user.id;
     const { name, description, friendIds } = req.body;
     
-    console.log('🔍 Debug: userId:', userId);
-    console.log('🔍 Debug: name:', name);
-    console.log('🔍 Debug: description:', description);
-    console.log('🔍 Debug: friendIds:', friendIds);
-    
     if (!name || !friendIds || !Array.isArray(friendIds)) {
-      console.log('❌ Debug: Validierung fehlgeschlagen');
       return res.status(400).json({ error: 'Name und Freund-IDs sind erforderlich' });
     }
     
@@ -74,13 +64,8 @@ router.post('/create', async (req, res) => {
       VALUES (?, ?, ?, false, 50)
     `;
     
-    console.log('🔍 Debug: Erstelle Gruppe mit Query:', createGroupQuery);
-    console.log('🔍 Debug: Parameter:', [name, description, userId]);
-    
     const [result] = await db.execute(createGroupQuery, [name, description, userId]);
     const groupId = result.insertId;
-    
-    console.log('🔍 Debug: Gruppe erstellt mit ID:', groupId);
     
     // Ersteller als Admin hinzufügen
     const addCreatorQuery = `
@@ -104,10 +89,7 @@ router.post('/create', async (req, res) => {
       message: 'Gruppe erfolgreich erstellt' 
     });
   } catch (error) {
-    console.error('❌ Debug: Fehler beim Erstellen der Gruppe:', error);
-    console.error('❌ Debug: Error stack:', error.stack);
-    console.error('❌ Debug: Error message:', error.message);
-    console.error('❌ Debug: Error code:', error.code);
+    console.error('Fehler beim Erstellen der Gruppe:', error);
     res.status(500).json({ error: 'Fehler beim Erstellen der Gruppe' });
   }
 });
