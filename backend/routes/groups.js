@@ -43,8 +43,26 @@ router.get('/list', async (req, res) => {
     
     res.json({ groups });
   } catch (error) {
-    console.error('Fehler beim Laden der Gruppen:', error);
-    res.status(500).json({ error: 'Fehler beim Laden der Gruppen' });
+    console.error('❌ Fehler beim Laden der Gruppen:', error);
+    
+    let errorMessage = 'Fehler beim Laden der Gruppen';
+    let errorDetails = {};
+    
+    if (error.code) errorDetails.code = error.code;
+    if (error.sqlMessage) errorDetails.sqlMessage = error.sqlMessage;
+    if (error.sql) errorDetails.sql = error.sql;
+    if (error.errno) errorDetails.errno = error.errno;
+    
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails
+    });
   }
 });
 
@@ -54,8 +72,29 @@ router.post('/create', async (req, res) => {
     const userId = req.user.id;
     const { name, description, friendIds } = req.body;
     
+    console.log('📝 Gruppen-Erstellung gestartet:', { userId, name, description, friendIds });
+    
     if (!name || !friendIds || !Array.isArray(friendIds)) {
-      return res.status(400).json({ error: 'Name und Freund-IDs sind erforderlich' });
+      return res.status(400).json({ 
+        error: 'Name und Freund-IDs sind erforderlich',
+        details: { name: !!name, friendIds: friendIds, isArray: Array.isArray(friendIds) }
+      });
+    }
+    
+    // Prüfe ob alle Freunde existieren
+    if (friendIds.length > 0) {
+      const placeholders = friendIds.map(() => '?').join(',');
+      const checkFriendsQuery = `SELECT id FROM users WHERE id IN (${placeholders})`;
+      const [existingFriends] = await db.execute(checkFriendsQuery, friendIds);
+      
+      if (existingFriends.length !== friendIds.length) {
+        const existingIds = existingFriends.map(f => f.id);
+        const missingIds = friendIds.filter(id => !existingIds.includes(id));
+        return res.status(400).json({ 
+          error: 'Einige Freunde existieren nicht',
+          details: { missingFriendIds: missingIds, existingIds }
+        });
+      }
     }
     
     // Gruppe erstellen
@@ -64,14 +103,18 @@ router.post('/create', async (req, res) => {
       VALUES (?, ?, ?, false, 50)
     `;
     
+    console.log('📝 Erstelle Gruppe mit Query:', createGroupQuery, [name, description, userId]);
     const [result] = await db.execute(createGroupQuery, [name, description, userId]);
     const groupId = result.insertId;
+    
+    console.log('✅ Gruppe erstellt mit ID:', groupId);
     
     // Ersteller als Admin hinzufügen
     const addCreatorQuery = `
       INSERT INTO group_members (group_id, user_id, role)
       VALUES (?, ?, 'admin')
     `;
+    console.log('📝 Füge Ersteller hinzu:', addCreatorQuery, [groupId, userId]);
     await db.execute(addCreatorQuery, [groupId, userId]);
     
     // Freunde als Mitglieder hinzufügen
@@ -80,17 +123,61 @@ router.post('/create', async (req, res) => {
         INSERT INTO group_members (group_id, user_id, role)
         VALUES (?, ?, 'member')
       `;
+      console.log('📝 Füge Freund hinzu:', addMemberQuery, [groupId, friendId]);
       await db.execute(addMemberQuery, [groupId, friendId]);
     }
     
+    console.log('✅ Gruppe erfolgreich erstellt:', groupId);
     res.json({ 
       success: true, 
       groupId,
       message: 'Gruppe erfolgreich erstellt' 
     });
   } catch (error) {
-    console.error('Fehler beim Erstellen der Gruppe:', error);
-    res.status(500).json({ error: 'Fehler beim Erstellen der Gruppe' });
+    console.error('❌ Fehler beim Erstellen der Gruppe:', error);
+    
+    // Detaillierte Fehlermeldung basierend auf Fehlertyp
+    let errorMessage = 'Fehler beim Erstellen der Gruppe';
+    let errorDetails = {};
+    
+    if (error.code) {
+      errorDetails.code = error.code;
+    }
+    
+    if (error.sqlMessage) {
+      errorDetails.sqlMessage = error.sqlMessage;
+    }
+    
+    if (error.sql) {
+      errorDetails.sql = error.sql;
+    }
+    
+    if (error.errno) {
+      errorDetails.errno = error.errno;
+    }
+    
+    if (error.sqlState) {
+      errorDetails.sqlState = error.sqlState;
+    }
+    
+    // Spezifische Fehlermeldungen für häufige Probleme
+    if (error.code === 'ER_DUP_ENTRY') {
+      errorMessage = 'Gruppe mit diesem Namen existiert bereits';
+    } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Referenzierter Benutzer existiert nicht';
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMessage = 'Datenbankzugriff verweigert';
+    } else if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Datenbankverbindung fehlgeschlagen';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Ungültiges Datenbankfeld';
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
