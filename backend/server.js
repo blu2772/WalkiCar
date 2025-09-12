@@ -233,6 +233,153 @@ io.on('connection', (socket) => {
       console.error('Error joining friends room:', error);
     }
   });
+  
+  // Voice Chat Events
+  socket.on('join_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      console.log(`User ${userId} joining group voice chat ${groupId}`);
+      
+      // Join group voice chat room
+      socket.join(`group_voice_${groupId}`);
+      
+      // Broadcast to other group members that user joined voice chat
+      socket.to(`group_voice_${groupId}`).emit('user_joined_voice_chat', {
+        userId,
+        groupId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Broadcast to group members that voice chat is now active
+      socket.to(`group_members_${groupId}`).emit('voice_chat_started', {
+        groupId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('Error joining group voice chat:', error);
+      socket.emit('voice_chat_error', { error: error.message });
+    }
+  });
+  
+  socket.on('leave_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      console.log(`User ${userId} leaving group voice chat ${groupId}`);
+      
+      // Leave group voice chat room
+      socket.leave(`group_voice_${groupId}`);
+      
+      // Broadcast to other group members that user left voice chat
+      socket.to(`group_voice_${groupId}`).emit('user_left_voice_chat', {
+        userId,
+        groupId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Check if voice chat is now empty and broadcast accordingly
+      const room = io.sockets.adapter.rooms.get(`group_voice_${groupId}`);
+      if (!room || room.size === 0) {
+        socket.to(`group_members_${groupId}`).emit('voice_chat_ended', {
+          groupId,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error leaving group voice chat:', error);
+      socket.emit('voice_chat_error', { error: error.message });
+    }
+  });
+  
+  socket.on('join_group_room', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Join group room to receive group updates
+      socket.join(`group_members_${groupId}`);
+      console.log(`User ${socket.id} joined group room for group ${groupId}`);
+    } catch (error) {
+      console.error('Error joining group room:', error);
+    }
+  });
+  
+  // WebRTC Signaling Events
+  socket.on('webrtc_offer', async (data) => {
+    try {
+      const { targetUserId, groupId, offer } = data;
+      console.log(`WebRTC offer from ${socket.id} to user ${targetUserId} in group ${groupId}`);
+      
+      // Forward offer to target user
+      socket.to(`user_${targetUserId}`).emit('webrtc_offer', {
+        fromUserId: data.fromUserId,
+        groupId: groupId,
+        offer: offer
+      });
+    } catch (error) {
+      console.error('Error handling WebRTC offer:', error);
+    }
+  });
+  
+  socket.on('webrtc_answer', async (data) => {
+    try {
+      const { targetUserId, groupId, answer } = data;
+      console.log(`WebRTC answer from ${socket.id} to user ${targetUserId} in group ${groupId}`);
+      
+      // Forward answer to target user
+      socket.to(`user_${targetUserId}`).emit('webrtc_answer', {
+        fromUserId: data.fromUserId,
+        groupId: groupId,
+        answer: answer
+      });
+    } catch (error) {
+      console.error('Error handling WebRTC answer:', error);
+    }
+  });
+  
+  socket.on('webrtc_ice_candidate', async (data) => {
+    try {
+      const { targetUserId, groupId, candidate } = data;
+      console.log(`WebRTC ICE candidate from ${socket.id} to user ${targetUserId} in group ${groupId}`);
+      
+      // Forward ICE candidate to target user
+      socket.to(`user_${targetUserId}`).emit('webrtc_ice_candidate', {
+        fromUserId: data.fromUserId,
+        groupId: groupId,
+        candidate: candidate
+      });
+    } catch (error) {
+      console.error('Error handling WebRTC ICE candidate:', error);
+    }
+  });
+  
+  socket.on('webrtc_end_call', async (data) => {
+    try {
+      const { targetUserId, groupId } = data;
+      console.log(`WebRTC end call from ${socket.id} to user ${targetUserId} in group ${groupId}`);
+      
+      // Forward end call to target user
+      socket.to(`user_${targetUserId}`).emit('webrtc_end_call', {
+        fromUserId: data.fromUserId,
+        groupId: groupId
+      });
+    } catch (error) {
+      console.error('Error handling WebRTC end call:', error);
+    }
+  });
+  
+  socket.on('join_user_room', async (data) => {
+    try {
+      const { userId } = data;
+      
+      // Join user-specific room for direct communication
+      socket.join(`user_${userId}`);
+      console.log(`User ${socket.id} joined user room for user ${userId}`);
+    } catch (error) {
+      console.error('Error joining user room:', error);
+    }
+  });
 });
 
 // Error handling middleware

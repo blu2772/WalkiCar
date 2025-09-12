@@ -105,6 +105,95 @@ class WebSocketManager: ObservableObject {
                 self?.connectionError = "Standort-Tracking-Fehler"
             }
         }
+        
+        // Voice Chat Events
+        socket.on("user_joined_voice_chat") { [weak self] data, ack in
+            print("🎤 WebSocketManager: Benutzer ist Voice Chat beigetreten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("UserJoinedVoiceChat"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("user_left_voice_chat") { [weak self] data, ack in
+            print("🎤 WebSocketManager: Benutzer hat Voice Chat verlassen")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("UserLeftVoiceChat"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("voice_chat_started") { [weak self] data, ack in
+            print("🎤 WebSocketManager: Voice Chat gestartet")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("VoiceChatStarted"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("voice_chat_ended") { [weak self] data, ack in
+            print("🎤 WebSocketManager: Voice Chat beendet")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("VoiceChatEnded"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("voice_chat_error") { [weak self] data, ack in
+            print("❌ WebSocketManager: Voice Chat Fehler")
+            DispatchQueue.main.async {
+                self?.connectionError = "Voice Chat Fehler"
+            }
+        }
+        
+        // WebRTC Signaling Events
+        socket.on("webrtc_offer") { [weak self] data, ack in
+            print("🎤 WebSocketManager: WebRTC Offer erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WebRTCOffer"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("webrtc_answer") { [weak self] data, ack in
+            print("🎤 WebSocketManager: WebRTC Answer erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WebRTCAnswer"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("webrtc_ice_candidate") { [weak self] data, ack in
+            print("🎤 WebSocketManager: WebRTC ICE Candidate erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WebRTCIceCandidate"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("webrtc_end_call") { [weak self] data, ack in
+            print("🎤 WebSocketManager: WebRTC End Call erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WebRTCEndCall"),
+                    object: data.first
+                )
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -190,6 +279,136 @@ class WebSocketManager: ObservableObject {
         
         socket.emit("join_friends_room", data)
         print("👥 WebSocketManager: Freunde-Raum beigetreten für User \(userId)")
+    }
+    
+    // MARK: - Voice Chat Methods
+    
+    func joinGroupVoiceChat(userId: Int, groupId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "userId": userId,
+            "groupId": groupId
+        ]
+        
+        socket.emit("join_group_voice_chat", data)
+        print("🎤 WebSocketManager: Voice Chat beigetreten für Gruppe \(groupId)")
+    }
+    
+    func leaveGroupVoiceChat(userId: Int, groupId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "userId": userId,
+            "groupId": groupId
+        ]
+        
+        socket.emit("leave_group_voice_chat", data)
+        print("🎤 WebSocketManager: Voice Chat verlassen für Gruppe \(groupId)")
+    }
+    
+    func joinGroupRoom(userId: Int, groupId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "userId": userId,
+            "groupId": groupId
+        ]
+        
+        socket.emit("join_group_room", data)
+        print("👥 WebSocketManager: Gruppen-Raum beigetreten für Gruppe \(groupId)")
+    }
+    
+    func joinUserRoom(userId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "userId": userId
+        ]
+        
+        socket.emit("join_user_room", data)
+        print("👤 WebSocketManager: Benutzer-Raum beigetreten für User \(userId)")
+    }
+    
+    // MARK: - WebRTC Signaling Methods
+    
+    func sendWebRTCOffer(fromUserId: Int, targetUserId: Int, groupId: Int, offer: [String: Any]) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "fromUserId": fromUserId,
+            "targetUserId": targetUserId,
+            "groupId": groupId,
+            "offer": offer
+        ]
+        
+        socket.emit("webrtc_offer", data)
+        print("🎤 WebSocketManager: WebRTC Offer gesendet an User \(targetUserId)")
+    }
+    
+    func sendWebRTCAnswer(fromUserId: Int, targetUserId: Int, groupId: Int, answer: [String: Any]) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "fromUserId": fromUserId,
+            "targetUserId": targetUserId,
+            "groupId": groupId,
+            "answer": answer
+        ]
+        
+        socket.emit("webrtc_answer", data)
+        print("🎤 WebSocketManager: WebRTC Answer gesendet an User \(targetUserId)")
+    }
+    
+    func sendWebRTCIceCandidate(fromUserId: Int, targetUserId: Int, groupId: Int, candidate: [String: Any]) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "fromUserId": fromUserId,
+            "targetUserId": targetUserId,
+            "groupId": groupId,
+            "candidate": candidate
+        ]
+        
+        socket.emit("webrtc_ice_candidate", data)
+        print("🎤 WebSocketManager: WebRTC ICE Candidate gesendet an User \(targetUserId)")
+    }
+    
+    func sendWebRTCEndCall(fromUserId: Int, targetUserId: Int, groupId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "fromUserId": fromUserId,
+            "targetUserId": targetUserId,
+            "groupId": groupId
+        ]
+        
+        socket.emit("webrtc_end_call", data)
+        print("🎤 WebSocketManager: WebRTC End Call gesendet an User \(targetUserId)")
     }
     
     // MARK: - Helper Methods

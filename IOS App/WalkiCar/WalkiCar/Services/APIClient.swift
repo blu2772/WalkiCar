@@ -370,6 +370,74 @@ class APIClient: ObservableObject {
         )
     }
     
+    // MARK: - Groups API Methods
+    
+    func getGroupsList() async throws -> GroupsListResponse {
+        print("🌐 APIClient: Lade Gruppen-Liste")
+        return try await makeRequest(
+            endpoint: "/groups/list",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: GroupsListResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func createGroup(_ request: CreateGroupRequest) async throws -> GroupActionResponse {
+        print("🌐 APIClient: Erstelle Gruppe: \(request.name)")
+        return try await makeRequest(
+            endpoint: "/groups/create",
+            method: "POST",
+            body: request,
+            responseType: GroupActionResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func leaveGroup(groupId: Int) async throws -> GroupActionResponse {
+        print("🌐 APIClient: Verlasse Gruppe ID: \(groupId)")
+        return try await makeRequest(
+            endpoint: "/groups/\(groupId)/leave",
+            method: "POST",
+            body: Optional<[String: String]>.none,
+            responseType: GroupActionResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func joinGroupVoiceChat(groupId: Int) async throws -> GroupActionResponse {
+        print("🌐 APIClient: Trete Voice Chat bei für Gruppe ID: \(groupId)")
+        return try await makeRequest(
+            endpoint: "/groups/\(groupId)/voice/join",
+            method: "POST",
+            body: Optional<[String: String]>.none,
+            responseType: GroupActionResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func leaveGroupVoiceChat(groupId: Int) async throws -> GroupActionResponse {
+        print("🌐 APIClient: Verlasse Voice Chat für Gruppe ID: \(groupId)")
+        return try await makeRequest(
+            endpoint: "/groups/\(groupId)/voice/leave",
+            method: "POST",
+            body: Optional<[String: String]>.none,
+            responseType: GroupActionResponse.self,
+            requiresAuth: true
+        )
+    }
+    
+    func getGroupVoiceChatStatus(groupId: Int) async throws -> VoiceChatStatus {
+        print("🌐 APIClient: Lade Voice Chat Status für Gruppe ID: \(groupId)")
+        return try await makeRequest(
+            endpoint: "/groups/\(groupId)/voice/status",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: VoiceChatStatus.self,
+            requiresAuth: true
+        )
+    }
+    
     // MARK: - Token Management
     
     func setAuthToken(_ token: String) {
