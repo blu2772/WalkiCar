@@ -50,13 +50,22 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         audioSession = AVAudioSession.sharedInstance()
         
         do {
+            // Audio Session für WebRTC Voice Chat optimieren
             try audioSession?.setCategory(.playAndRecord, mode: .voiceChat, options: [
                 .defaultToSpeaker,
                 .allowBluetooth,
-                .allowBluetoothA2DP
+                .allowBluetoothA2DP,
+                .duckOthers
             ])
+            
+            // Sample Rate und Buffer für Voice Chat optimieren
+            try audioSession?.setPreferredSampleRate(48000.0) // Standard für Voice Chat
+            try audioSession?.setPreferredIOBufferDuration(0.02) // 20ms Buffer für Voice Chat
+            
+            // Audio Session aktivieren
             try audioSession?.setActive(true)
             print("🎤 WebRTCAudioEngine: Audio Session konfiguriert")
+            print("🔊 WebRTCAudioEngine: Audio Route: \(audioSession?.currentRoute.outputs.first?.portType.rawValue ?? "unbekannt")")
         } catch {
             print("❌ WebRTCAudioEngine: Audio Session Fehler: \(error)")
             connectionError = "Audio Session Fehler: \(error.localizedDescription)"
@@ -101,12 +110,28 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         guard let audioEngine = audioEngine else { return }
         
         do {
+            // Audio Session aktivieren bevor Audio Engine startet
+            print("🔊 WebRTCAudioEngine: Aktiviere Audio Session...")
+            try audioSession?.setActive(true)
+            print("✅ WebRTCAudioEngine: Audio Session aktiviert")
+            
             try audioEngine.start()
             isConnected = true
             print("🎤 WebRTCAudioEngine: Audio gestartet")
+            
+            // Debug Audio Status
+            debugAudioStatus()
         } catch {
             print("❌ WebRTCAudioEngine: Audio Start Fehler: \(error)")
             connectionError = "Audio Start Fehler: \(error.localizedDescription)"
+            
+            // Fallback: Versuche Audio Session trotzdem zu aktivieren
+            do {
+                try audioSession?.setActive(true)
+                print("✅ WebRTCAudioEngine: Audio Session nach Fehler aktiviert")
+            } catch {
+                print("❌ WebRTCAudioEngine: Audio Session Aktivierung fehlgeschlagen: \(error)")
+            }
         }
     }
     
@@ -114,6 +139,47 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         audioEngine?.stop()
         isConnected = false
         print("🔇 WebRTCAudioEngine: Audio gestoppt")
+    }
+    
+    func debugAudioStatus() {
+        guard let audioSession = audioSession else {
+            print("❌ WebRTCAudioEngine: Keine Audio Session")
+            return
+        }
+        
+        print("🔊 WebRTCAudioEngine: Audio Status:")
+        print("   - Category: \(audioSession.category.rawValue)")
+        print("   - Mode: \(audioSession.mode.rawValue)")
+        print("   - Other Audio Playing: \(audioSession.isOtherAudioPlaying)")
+        print("   - Route: \(audioSession.currentRoute.outputs.map { $0.portType.rawValue })")
+        print("   - Input Available: \(audioSession.isInputAvailable)")
+        print("   - Output Available: \(audioSession.outputVolume)")
+        print("   - Preferred Sample Rate: \(audioSession.preferredSampleRate)")
+        print("   - Current Sample Rate: \(audioSession.sampleRate)")
+        
+        // Versuche Audio Session zu aktivieren falls sie nicht aktiv ist
+        do {
+            try audioSession.setActive(true)
+            print("✅ WebRTCAudioEngine: Audio Session aktiviert")
+            
+            // Warte kurz und prüfe erneut
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                print("🔊 WebRTCAudioEngine: Audio Status nach Aktivierung:")
+                print("   - Other Audio Playing: \(audioSession.isOtherAudioPlaying)")
+                print("   - Route: \(audioSession.currentRoute.outputs.map { $0.portType.rawValue })")
+                print("   - Sample Rate: \(audioSession.sampleRate)")
+                
+                // Versuche Audio Session erneut zu aktivieren
+                do {
+                    try audioSession.setActive(true)
+                    print("✅ WebRTCAudioEngine: Audio Session erneut aktiviert")
+                } catch {
+                    print("❌ WebRTCAudioEngine: Audio Session Reaktivierung fehlgeschlagen: \(error)")
+                }
+            }
+        } catch {
+            print("❌ WebRTCAudioEngine: Audio Session Aktivierung fehlgeschlagen: \(error)")
+        }
     }
     
     func toggleMicrophone() {

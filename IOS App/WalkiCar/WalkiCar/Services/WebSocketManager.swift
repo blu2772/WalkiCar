@@ -24,8 +24,12 @@ class WebSocketManager: ObservableObject {
     }
     
     private func setupSocket() {
-        guard let url = URL(string: "https://walkcar.timrmp.de") else {
-            print("❌ WebSocketManager: Ungültige URL")
+        // DEBUG: Eindeutige URL mit Zeitstempel um Caching zu vermeiden
+        let debugURL = "https://walkcar.timrmp.de"
+        print("🔍 WebSocketManager: Verbinde mit URL: \(debugURL)")
+        
+        guard let url = URL(string: debugURL) else {
+            print("❌ WebSocketManager: Ungültige URL: \(debugURL)")
             return
         }
         
@@ -43,6 +47,7 @@ class WebSocketManager: ObservableObject {
         // Auth-Token hinzufügen falls verfügbar
         if let token = APIClient.shared.getAuthToken() {
             print("🔐 WebSocketManager: Auth-Token für Socket.IO gesetzt: \(token)")
+            print("🔍 WebSocketManager: DEBUG - Server sollte gestoppt sein, aber Socket.IO antwortet noch!")
             // Token über connectParams senden (wird als Query-Parameter übertragen)
             config.insert(.connectParams(["token": token]))
         } else {
@@ -70,8 +75,33 @@ class WebSocketManager: ObservableObject {
                 if let userId = AuthManager.shared.currentUser?.id {
                     print("👤 WebSocketManager: Automatisch Benutzer-Raum beitreten für User \(userId)")
                     self?.joinUserRoom(userId: userId)
+                    
+                    // Auch Freunde-Raum beitreten für Live-Updates
+                    self?.joinFriendsRoom(userId: userId)
                 } else {
                     print("❌ WebSocketManager: Kein Benutzer-ID verfügbar für Raum-Beitritt")
+                    print("🔍 WebSocketManager: Versuche User-ID aus Token zu extrahieren...")
+                    
+                    // Fallback: User-ID aus Token extrahieren
+                    if let token = APIClient.shared.getAuthToken() {
+                        // Einfache JWT-Dekodierung ohne Verifizierung für User-ID
+                        let parts = token.split(separator: ".")
+                        if parts.count >= 2 {
+                            let payload = String(parts[1])
+                            if let data = Data(base64Encoded: payload + "==") {
+                                do {
+                                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                                       let userId = json["userId"] as? Int {
+                                        print("👤 WebSocketManager: User-ID aus Token extrahiert: \(userId)")
+                                        self?.joinUserRoom(userId: userId)
+                                        self?.joinFriendsRoom(userId: userId)
+                                    }
+                                } catch {
+                                    print("❌ WebSocketManager: Fehler beim Dekodieren des Tokens: \(error)")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -136,6 +166,7 @@ class WebSocketManager: ObservableObject {
         // Voice Chat Events
         socket.on("user_joined_voice_chat") { [weak self] data, ack in
             print("🎤 WebSocketManager: Benutzer ist Voice Chat beigetreten - Data: \(data)")
+            print("🔍 WebSocketManager: Event-Details: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("UserJoinedVoiceChat"),
@@ -144,8 +175,14 @@ class WebSocketManager: ObservableObject {
             }
         }
         
+        // Test Event Handler - für Debugging
+        socket.on("test_event") { [weak self] data, ack in
+            print("🧪 WebSocketManager: TEST EVENT empfangen - Data: \(data)")
+        }
+        
         socket.on("user_left_voice_chat") { [weak self] data, ack in
             print("🎤 WebSocketManager: Benutzer hat Voice Chat verlassen - Data: \(data)")
+            print("🔍 WebSocketManager: Event-Details: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("UserLeftVoiceChat"),
@@ -375,6 +412,10 @@ class WebSocketManager: ObservableObject {
         
         socket.emit("join_group_room", data)
         print("👥 WebSocketManager: Gruppen-Raum beigetreten für Gruppe \(groupId)")
+        
+        // Zusätzlich: Voice Chat Raum beitreten
+        socket.emit("join_group_voice_chat", data)
+        print("🎤 WebSocketManager: Voice Chat Raum beigetreten für Gruppe \(groupId)")
     }
     
     func joinUserRoom(userId: Int) {
@@ -391,6 +432,17 @@ class WebSocketManager: ObservableObject {
         socket.emit("join_user_room", data) { [weak self] in
             print("✅ WebSocketManager: join_user_room Event gesendet für User \(userId)")
         }
+    }
+    
+    // Test-Funktion für Debugging
+    func sendTestEvent() {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden für Test-Event")
+            return
+        }
+        
+        socket.emit("test_event", ["message": "Test von iOS App"])
+        print("🧪 WebSocketManager: Test-Event gesendet")
     }
     
     // MARK: - WebRTC Signaling Methods

@@ -134,6 +134,8 @@ class GroupManager: ObservableObject {
                         
                         // WebSocket Rooms beitreten
                         if let userId = AuthManager.shared.currentUser?.id {
+                            print("🎤 GroupManager: Trete WebSocket-Räumen bei für User \(userId), Gruppe \(groupId)")
+                            
                             // Benutzer-Raum beitreten (falls noch nicht geschehen)
                             self.webSocketManager.joinUserRoom(userId: userId)
                             
@@ -145,6 +147,39 @@ class GroupManager: ObservableObject {
                             
                             // WebRTC Voice Chat starten
                             self.webRTCPeerManager.startVoiceChat(groupId: groupId, userId: userId)
+                        } else {
+                            print("❌ GroupManager: Keine User-ID verfügbar für WebSocket-Räume")
+                            print("🔍 GroupManager: Versuche User-ID aus Token zu extrahieren...")
+                            
+                            // Fallback: User-ID aus Token extrahieren
+                            if let token = APIClient.shared.getAuthToken() {
+                                let parts = token.split(separator: ".")
+                                if parts.count >= 2 {
+                                    let payload = String(parts[1])
+                                    if let data = Data(base64Encoded: payload + "==") {
+                                        do {
+                                            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                                               let userId = json["userId"] as? Int {
+                                                print("👤 GroupManager: User-ID aus Token extrahiert: \(userId)")
+                                                
+                                                // Benutzer-Raum beitreten
+                                                self.webSocketManager.joinUserRoom(userId: userId)
+                                                
+                                                // Gruppen-Raum beitreten
+                                                self.webSocketManager.joinGroupRoom(userId: userId, groupId: groupId)
+                                                
+                                                // Voice Chat beitreten
+                                                self.webSocketManager.joinGroupVoiceChat(userId: userId, groupId: groupId)
+                                                
+                                                // WebRTC Voice Chat starten
+                                                self.webRTCPeerManager.startVoiceChat(groupId: groupId, userId: userId)
+                                            }
+                                        } catch {
+                                            print("❌ GroupManager: Fehler beim Dekodieren des Tokens: \(error)")
+                                        }
+                                    }
+                                }
+                            }
                         }
                         
                         // Aktuelle Gruppe setzen
@@ -281,9 +316,13 @@ class GroupManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            print("🔔 GroupManager: UserJoinedVoiceChat Notification empfangen - Object: \(notification.object ?? "nil")")
             guard let data = notification.object as? [String: Any],
                   let groupId = data["groupId"] as? Int,
-                  let userId = data["userId"] as? Int else { return }
+                  let userId = data["userId"] as? Int else { 
+                print("❌ GroupManager: UserJoinedVoiceChat - Ungültige Daten: \(notification.object ?? "nil")")
+                return 
+            }
             
             Task { @MainActor in
                 self?.handleUserJoinedVoiceChat(groupId: groupId, userId: userId)
@@ -295,9 +334,13 @@ class GroupManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            print("🔔 GroupManager: UserLeftVoiceChat Notification empfangen - Object: \(notification.object ?? "nil")")
             guard let data = notification.object as? [String: Any],
                   let groupId = data["groupId"] as? Int,
-                  let userId = data["userId"] as? Int else { return }
+                  let userId = data["userId"] as? Int else { 
+                print("❌ GroupManager: UserLeftVoiceChat - Ungültige Daten: \(notification.object ?? "nil")")
+                return 
+            }
             
             Task { @MainActor in
                 self?.handleUserLeftVoiceChat(groupId: groupId, userId: userId)
@@ -332,11 +375,13 @@ class GroupManager: ObservableObject {
     }
     
     private func handleUserJoinedVoiceChat(groupId: Int, userId: Int) {
+        print("👥 GroupManager: Benutzer \(userId) ist Voice Chat beigetreten für Gruppe \(groupId)")
         // Aktualisiere Voice Chat Status für die Gruppe
         loadVoiceChatStatus(groupId: groupId)
     }
     
     private func handleUserLeftVoiceChat(groupId: Int, userId: Int) {
+        print("👥 GroupManager: Benutzer \(userId) hat Voice Chat verlassen für Gruppe \(groupId)")
         // Entferne Benutzer aus Voice Chat Teilnehmern
         voiceChatParticipants.removeAll { $0.userId == userId }
         
