@@ -11,7 +11,7 @@ struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     
     var body: some View {
-        Group {
+        SwiftUI.Group {
             if authManager.isAuthenticated {
                 MainTabView()
             } else {
@@ -26,5 +26,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environmentObject(AuthManager())
+        .environmentObject(AuthManager.shared)
 }

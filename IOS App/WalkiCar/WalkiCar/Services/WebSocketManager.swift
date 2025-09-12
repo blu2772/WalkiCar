@@ -13,6 +13,11 @@ class WebSocketManager: ObservableObject {
     private var socket: SocketIOClient?
     private let apiClient = APIClient.shared
     
+    // MARK: - Public Properties
+    var socketClient: SocketIOClient? {
+        return socket
+    }
+    
     // MARK: - Initialization
     private init() {
         setupSocket()

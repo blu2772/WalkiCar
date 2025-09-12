@@ -64,6 +64,23 @@ struct Group: Codable, Identifiable {
             voiceChatActive = nil
         }
     }
+    
+    // Public initializer for creating Group instances
+    init(id: Int, name: String, description: String?, creatorId: Int, isPublic: Bool, maxMembers: Int, isActive: Bool, createdAt: String, updatedAt: String, memberCount: Int, voiceChatActive: Bool?, voiceChatStartedAt: String?, members: [GroupMember]) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.creatorId = creatorId
+        self.isPublic = isPublic
+        self.maxMembers = maxMembers
+        self.isActive = isActive
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.memberCount = memberCount
+        self.voiceChatActive = voiceChatActive
+        self.voiceChatStartedAt = voiceChatStartedAt
+        self.members = members
+    }
 }
 
 struct GroupMember: Codable, Identifiable {

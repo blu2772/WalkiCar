@@ -149,5 +149,5 @@ struct EmailTextFieldStyle: TextFieldStyle {
 }
 
 #Preview {
-    EmailLoginView(authManager: AuthManager(), onShowRegister: {})
+    EmailLoginView(authManager: AuthManager.shared, onShowRegister: {})
 }

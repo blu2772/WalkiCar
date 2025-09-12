@@ -11,6 +11,8 @@ import SwiftUI
 
 @MainActor
 class AuthManager: NSObject, ObservableObject {
+    static let shared = AuthManager()
+    
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var isLoading = false
@@ -18,7 +20,7 @@ class AuthManager: NSObject, ObservableObject {
     
     private let apiClient = APIClient.shared
     
-    override init() {
+    private override init() {
         super.init()
         checkAuthenticationStatus()
     }

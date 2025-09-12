@@ -23,7 +23,6 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     // MARK: - Private Properties
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
-    private var outputNode: AVAudioOutputNode?
     private var audioSession: AVAudioSession?
     
     // WebRTC Components
@@ -36,11 +35,6 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     private let audioFormat = AVAudioFormat(
         standardFormatWithSampleRate: 48000,
         channels: 1
-    )!
-    
-    private let webRTCFormat = RTCAudioFormat(
-        sampleRate: 48000,
-        numChannels: 1
     )!
     
     // MARK: - Initialization
@@ -92,16 +86,10 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         guard let audioEngine = audioEngine else { return }
         
         inputNode = audioEngine.inputNode
-        outputNode = audioEngine.outputNode
         
         // Configure input node for microphone
         inputNode?.installTap(onBus: 0, bufferSize: 1024, format: audioFormat) { [weak self] buffer, time in
             self?.processAudioInput(buffer: buffer, time: time)
-        }
-        
-        // Configure output node for speaker
-        outputNode?.installTap(onBus: 0, bufferSize: 1024, format: audioFormat) { [weak self] buffer, time in
-            self?.processAudioOutput(buffer: buffer, time: time)
         }
         
         print("🎵 WebRTCAudioEngine: Audio Engine konfiguriert")
@@ -136,8 +124,12 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     
     func toggleSpeaker() {
         isSpeakerEnabled.toggle()
-        outputNode?.volume = isSpeakerEnabled ? 1.0 : 0.0
-        print("🔊 WebRTCAudioEngine: Lautsprecher \(isSpeakerEnabled ? "aktiviert" : "deaktiviert")")
+        do {
+            try audioSession?.overrideOutputAudioPort(isSpeakerEnabled ? .speaker : .none)
+            print("🔊 WebRTCAudioEngine: Lautsprecher \(isSpeakerEnabled ? "aktiviert" : "deaktiviert")")
+        } catch {
+            print("❌ WebRTCAudioEngine: Lautsprecher Fehler: \(error)")
+        }
     }
     
     func setSpeakerMode(_ mode: AVAudioSession.PortOverride) {
@@ -169,7 +161,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         let audioTrack = factory.audioTrack(withTrackId: "audio_\(userId)")
         audioTracks[userId] = audioTrack
         
-        let audioSender = peerConnection.add(audioTrack, streamIds: ["stream_\(groupId)"])
+        peerConnection?.add(audioTrack, streamIds: ["stream_\(groupId)"])
         print("🌐 WebRTCAudioEngine: Peer Connection erstellt für User \(userId)")
         
         peerConnections[userId] = peerConnection
@@ -269,8 +261,13 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     }
     
     func addIceCandidate(for userId: Int, candidate: RTCIceCandidate) {
-        peerConnections[userId]?.add(candidate)
-        print("🌐 WebRTCAudioEngine: ICE Candidate hinzugefügt für User \(userId)")
+        peerConnections[userId]?.add(candidate) { error in
+            if let error = error {
+                print("❌ WebRTCAudioEngine: ICE Candidate Fehler: \(error)")
+            } else {
+                print("🌐 WebRTCAudioEngine: ICE Candidate hinzugefügt für User \(userId)")
+            }
+        }
     }
     
     // MARK: - Audio Processing
@@ -284,11 +281,6 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         // Send audio to WebRTC peers
         sendAudioToPeers(buffer: buffer)
-    }
-    
-    private func processAudioOutput(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        // Process received audio from WebRTC peers
-        // This would be implemented with WebRTC audio rendering
     }
     
     private func calculateAudioLevel(buffer: AVAudioPCMBuffer) -> Float {
@@ -313,61 +305,94 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     // MARK: - Cleanup
     
     deinit {
-        stopAudio()
+        // Note: We can't use Task in deinit as it captures self
+        // The audio will be cleaned up when the object is deallocated
         RTCShutdownInternalTracer()
-        RTCShutdownSSL()
+        // Note: RTCShutdownSSL is not available in this WebRTC version
+        // The SSL will be cleaned up automatically
     }
 }
 
 // MARK: - RTCPeerConnectionDelegate
 
 extension WebRTCAudioEngine: RTCPeerConnectionDelegate {
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {
         print("🌐 WebRTCAudioEngine: Signaling State geändert: \(stateChanged)")
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCIceConnectionState) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCIceConnectionState) {
         print("🌐 WebRTCAudioEngine: ICE Connection State geändert: \(stateChanged)")
         
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.isConnected = (stateChanged == .connected || stateChanged == .completed)
         }
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCIceGatheringState) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCIceGatheringState) {
         print("🌐 WebRTCAudioEngine: ICE Gathering State geändert: \(stateChanged)")
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        print("🌐 WebRTCAudioEngine: ICE Candidate generiert")
+        
+        // Find the user ID for this peer connection
+        Task { @MainActor in
+            if let userId = self.peerConnections.first(where: { $0.value == peerConnection })?.key {
+                // Send ICE candidate via WebSocket
+                let candidateData: [String: Any] = [
+                    "candidate": candidate.sdp,
+                    "sdpMLineIndex": candidate.sdpMLineIndex,
+                    "sdpMid": candidate.sdpMid ?? ""
+                ]
+                
+                // Notify WebRTCPeerConnectionManager to send the candidate
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WebRTCIceCandidateGenerated"),
+                    object: [
+                        "userId": userId,
+                        "candidate": candidateData
+                    ]
+                )
+            }
+        }
+    }
+    
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
         print("🌐 WebRTCAudioEngine: Media Stream hinzugefügt")
         
         // Handle remote audio tracks
         for audioTrack in stream.audioTracks {
             // Find the user ID for this peer connection
-            if let userId = peerConnections.first(where: { $0.value == peerConnection })?.key {
-                remoteAudioTracks[userId] = audioTrack
-                print("🎵 WebRTCAudioEngine: Remote Audio Track hinzugefügt für User \(userId)")
+            Task { @MainActor in
+                if let userId = self.peerConnections.first(where: { $0.value == peerConnection })?.key {
+                    self.remoteAudioTracks[userId] = audioTrack
+                    print("🎵 WebRTCAudioEngine: Remote Audio Track hinzugefügt für User \(userId)")
+                }
             }
         }
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {
         print("🌐 WebRTCAudioEngine: Media Stream entfernt")
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         print("🌐 WebRTCAudioEngine: RTP Receiver hinzugefügt")
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove rtpReceiver: RTCRtpReceiver) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didRemove rtpReceiver: RTCRtpReceiver) {
         print("🌐 WebRTCAudioEngine: RTP Receiver entfernt")
     }
     
-    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {
+        print("🌐 WebRTCAudioEngine: ICE Candidates entfernt")
+    }
+    
+    nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
         print("🌐 WebRTCAudioEngine: Data Channel geöffnet")
     }
     
-    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {
+    nonisolated func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {
         print("🌐 WebRTCAudioEngine: Peer Connection sollte verhandeln")
     }
 }

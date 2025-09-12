@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AVFoundation
 
 @MainActor
 class GroupManager: ObservableObject {
@@ -207,20 +208,21 @@ class GroupManager: ObservableObject {
                     
                     // Aktualisiere Gruppen-Status
                     if let index = self.groups.firstIndex(where: { $0.id == groupId }) {
+                        let currentGroup = self.groups[index]
                         self.groups[index] = Group(
-                            id: self.groups[index].id,
-                            name: self.groups[index].name,
-                            description: self.groups[index].description,
-                            creatorId: self.groups[index].creatorId,
-                            isPublic: self.groups[index].isPublic,
-                            maxMembers: self.groups[index].maxMembers,
-                            isActive: self.groups[index].isActive,
-                            createdAt: self.groups[index].createdAt,
-                            updatedAt: self.groups[index].updatedAt,
-                            memberCount: self.groups[index].memberCount,
+                            id: currentGroup.id,
+                            name: currentGroup.name,
+                            description: currentGroup.description,
+                            creatorId: currentGroup.creatorId,
+                            isPublic: currentGroup.isPublic,
+                            maxMembers: currentGroup.maxMembers,
+                            isActive: currentGroup.isActive,
+                            createdAt: currentGroup.createdAt,
+                            updatedAt: currentGroup.updatedAt,
+                            memberCount: currentGroup.memberCount,
                             voiceChatActive: status.isActive,
                             voiceChatStartedAt: status.participants.first?.startedAt,
-                            members: self.groups[index].members
+                            members: currentGroup.members
                         )
                     }
                 }
@@ -268,7 +270,9 @@ class GroupManager: ObservableObject {
                   let groupId = data["groupId"] as? Int,
                   let userId = data["userId"] as? Int else { return }
             
-            self?.handleUserJoinedVoiceChat(groupId: groupId, userId: userId)
+            Task { @MainActor in
+                self?.handleUserJoinedVoiceChat(groupId: groupId, userId: userId)
+            }
         }
         
         NotificationCenter.default.addObserver(
@@ -280,7 +284,9 @@ class GroupManager: ObservableObject {
                   let groupId = data["groupId"] as? Int,
                   let userId = data["userId"] as? Int else { return }
             
-            self?.handleUserLeftVoiceChat(groupId: groupId, userId: userId)
+            Task { @MainActor in
+                self?.handleUserLeftVoiceChat(groupId: groupId, userId: userId)
+            }
         }
         
         NotificationCenter.default.addObserver(
@@ -291,7 +297,9 @@ class GroupManager: ObservableObject {
             guard let data = notification.object as? [String: Any],
                   let groupId = data["groupId"] as? Int else { return }
             
-            self?.handleVoiceChatStarted(groupId: groupId)
+            Task { @MainActor in
+                self?.handleVoiceChatStarted(groupId: groupId)
+            }
         }
         
         NotificationCenter.default.addObserver(
@@ -302,7 +310,9 @@ class GroupManager: ObservableObject {
             guard let data = notification.object as? [String: Any],
                   let groupId = data["groupId"] as? Int else { return }
             
-            self?.handleVoiceChatEnded(groupId: groupId)
+            Task { @MainActor in
+                self?.handleVoiceChatEnded(groupId: groupId)
+            }
         }
     }
     

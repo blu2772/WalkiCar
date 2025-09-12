@@ -182,5 +182,5 @@ struct EmailRegisterView: View {
 }
 
 #Preview {
-    EmailRegisterView(authManager: AuthManager(), onShowLogin: {})
+    EmailRegisterView(authManager: AuthManager.shared, onShowLogin: {})
 }
