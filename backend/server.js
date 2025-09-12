@@ -154,6 +154,9 @@ io.use(async (socket, next) => {
 
     // JWT Token verifizieren
     const jwt = require('jsonwebtoken');
+    console.log('🔐 Socket.IO Auth: Token zum Verifizieren:', token.substring(0, 20) + '...');
+    console.log('🔐 Socket.IO Auth: JWT_SECRET vorhanden:', process.env.JWT_SECRET ? 'Ja' : 'Nein');
+    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('✅ Socket.IO Auth: Token verifiziert für User ID:', decoded.userId);
 
