@@ -85,23 +85,32 @@ router.post('/update', authenticateToken, async (req, res) => {
 router.post('/park', authenticateToken, async (req, res) => {
     try {
         console.log('🅿️ Park Request:', req.body);
+        console.log('🅿️ Park Request Headers:', req.headers);
+        console.log('🅿️ Park Request User:', req.user);
         
         const { car_id } = req.body;
         const userId = req.user.id;
         
+        console.log('🅿️ Extracted car_id:', car_id, 'userId:', userId);
+        
         if (!car_id) {
+            console.log('❌ Park: Keine car_id im Request Body');
             return res.status(400).json({
                 error: 'Auto-ID ist erforderlich'
             });
         }
         
         // Prüfe ob Auto dem Benutzer gehört
+        console.log('🅿️ Prüfe Auto-Berechtigung für car_id:', car_id, 'userId:', userId);
         const carCheck = await query(
             'SELECT id FROM cars WHERE id = ? AND user_id = ?',
             [car_id, userId]
         );
         
+        console.log('🅿️ Car Check Ergebnis:', carCheck);
+        
         if (carCheck.length === 0) {
+            console.log('❌ Park: Auto nicht gefunden oder nicht berechtigt');
             return res.status(404).json({
                 error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
             });
