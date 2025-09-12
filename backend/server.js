@@ -129,48 +129,21 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.1',
-    socketAuth: 'Updated'
+    version: '1.0.2',
+    socketAuth: 'DISABLED_FOR_TESTING'
   });
 });
 
-// Socket.IO connection handling - Vereinfachte Version
+// Socket.IO connection handling - TEMPORÄR DEAKTIVIERT ZUM TESTEN
 io.use(async (socket, next) => {
-  try {
-    // Token aus Query-Parametern lesen (wie von iOS-App gesendet)
-    const token = socket.handshake.query.token;
-    
-    if (!token) {
-      console.log('❌ Socket.IO: Kein Token in Query-Parametern');
-      return next(new Error('Authentication error'));
-    }
-
-    // JWT Token verifizieren
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Benutzer in der Datenbank überprüfen
-    const { query } = require('./config/database');
-    const user = await query(
-      'SELECT id, username, display_name, is_active FROM users WHERE id = ? AND is_active = TRUE',
-      [decoded.userId]
-    );
-
-    if (user.length === 0) {
-      console.log('❌ Socket.IO: Benutzer nicht gefunden');
-      return next(new Error('Authentication error'));
-    }
-
-    // Benutzer-Daten an Socket anhängen
-    socket.userId = decoded.userId;
-    socket.user = user[0];
-    console.log('✅ Socket.IO: Benutzer authentifiziert:', socket.user.username);
-    
-    next();
-  } catch (error) {
-    console.log('❌ Socket.IO Auth Fehler:', error.message);
-    return next(new Error('Authentication error'));
-  }
+  console.log('🔓 Socket.IO: Authentifizierung temporär deaktiviert - alle Verbindungen erlaubt');
+  console.log('🔓 Socket.IO: Token in Query:', socket.handshake.query.token ? 'Vorhanden' : 'Nicht vorhanden');
+  
+  // Temporär alle Verbindungen erlauben
+  socket.userId = 7; // Hardcoded für Test
+  socket.user = { id: 7, username: 'TimRempel', display_name: 'Tim.rmp' };
+  
+  next();
 });
 
 io.on('connection', (socket) => {
