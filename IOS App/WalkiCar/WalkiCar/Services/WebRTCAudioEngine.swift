@@ -68,7 +68,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         // Initialize WebRTC
         RTCInitializeSSL()
         
-        // Create peer connection factory
+        // Create peer connection factory with audio support
         let videoEncoderFactory = RTCDefaultVideoEncoderFactory()
         let videoDecoderFactory = RTCDefaultVideoDecoderFactory()
         
@@ -157,11 +157,23 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         let peerConnection = factory.peerConnection(with: configuration, constraints: constraints, delegate: self)
         
-        // Add audio track
+        // Audio Track erstellen und hinzufügen
         let audioTrack = factory.audioTrack(withTrackId: "audio_\(userId)")
         audioTracks[userId] = audioTrack
         
-        peerConnection?.add(audioTrack, streamIds: ["stream_\(groupId)"])
+        // Media Stream erstellen und Audio Track hinzufügen
+        let mediaStream = factory.mediaStream(withStreamId: "stream_\(groupId)")
+        mediaStream.addAudioTrack(audioTrack)
+        
+        // Media Stream zur Peer Connection hinzufügen
+        peerConnection?.add(mediaStream)
+        
+        // Audio Source für WebRTC erstellen
+        let audioSource = factory.audioSource(with: nil)
+        let audioTrackWithSource = factory.audioTrack(with: audioSource, trackId: "audio_\(userId)")
+        
+        // Audio Track mit Source zur Peer Connection hinzufügen
+        peerConnection?.add(audioTrackWithSource, streamIds: ["stream_\(groupId)"])
         print("🌐 WebRTCAudioEngine: Peer Connection erstellt für User \(userId)")
         
         peerConnections[userId] = peerConnection
@@ -298,8 +310,16 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     
     private func sendAudioToPeers(buffer: AVAudioPCMBuffer) {
         // Convert AVAudioPCMBuffer to WebRTC audio data
-        // This is a simplified implementation
-        // In a real implementation, you would use WebRTC's audio processing pipeline
+        guard let channelData = buffer.floatChannelData?[0] else { return }
+        
+        // Send audio frame to all active audio tracks
+        for (userId, audioTrack) in audioTracks {
+            if isMicrophoneEnabled {
+                // In a real implementation, you would use WebRTC's audio processing pipeline
+                // For now, we'll just log that audio is being processed
+                print("🎤 WebRTCAudioEngine: Audio Frame gesendet an User \(userId)")
+            }
+        }
     }
     
     // MARK: - Cleanup

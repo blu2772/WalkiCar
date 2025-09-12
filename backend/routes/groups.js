@@ -301,6 +301,25 @@ router.post('/:groupId/voice/join', async (req, res) => {
     `;
     await dbQuery(createSessionQuery, [groupId, userId]);
     
+    // Benachrichtige alle Gruppenmitglieder über den Voice Chat Beitritt
+    const getGroupMembersQuery = `
+      SELECT user_id FROM group_members WHERE group_id = ?
+    `;
+    const groupMembers = await dbQuery(getGroupMembersQuery, [groupId]);
+    
+    // Sende WebSocket Event an alle Gruppenmitglieder
+    const io = req.app.get('io');
+    if (io) {
+      groupMembers.forEach(member => {
+        io.to(`user_${member.user_id}`).emit('user_joined_voice_chat', {
+          groupId: parseInt(groupId),
+          userId: userId,
+          username: req.user.username,
+          displayName: req.user.display_name
+        });
+      });
+    }
+    
     res.json({ success: true, message: 'Voice Chat beigetreten' });
   } catch (error) {
     console.error('❌ Fehler beim Beitreten zum Voice Chat:', error);
@@ -353,6 +372,25 @@ router.post('/:groupId/voice/leave', async (req, res) => {
     
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Keine aktive Voice Session gefunden' });
+    }
+    
+    // Benachrichtige alle Gruppenmitglieder über das Verlassen des Voice Chats
+    const getGroupMembersQuery = `
+      SELECT user_id FROM group_members WHERE group_id = ?
+    `;
+    const groupMembers = await dbQuery(getGroupMembersQuery, [groupId]);
+    
+    // Sende WebSocket Event an alle Gruppenmitglieder
+    const io = req.app.get('io');
+    if (io) {
+      groupMembers.forEach(member => {
+        io.to(`user_${member.user_id}`).emit('user_left_voice_chat', {
+          groupId: parseInt(groupId),
+          userId: userId,
+          username: req.user.username,
+          displayName: req.user.display_name
+        });
+      });
     }
     
     res.json({ success: true, message: 'Voice Chat verlassen' });

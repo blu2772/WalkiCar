@@ -113,6 +113,9 @@ app.use(express.urlencoded({ extended: true }));
 // Static files
 app.use('/uploads', express.static('uploads'));
 
+// Socket.IO an App weitergeben (vor Routen-Registrierung)
+app.set('io', io);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);

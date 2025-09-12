@@ -46,14 +46,30 @@ struct Group: Codable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         description = try container.decodeIfPresent(String.self, forKey: .description)
         creatorId = try container.decode(Int.self, forKey: .creatorId)
-        isPublic = try container.decode(Bool.self, forKey: .isPublic)
         maxMembers = try container.decode(Int.self, forKey: .maxMembers)
-        isActive = try container.decode(Bool.self, forKey: .isActive)
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
         memberCount = try container.decode(Int.self, forKey: .memberCount)
         voiceChatStartedAt = try container.decodeIfPresent(String.self, forKey: .voiceChatStartedAt)
         members = try container.decode([GroupMember].self, forKey: .members)
+        
+        // Flexible is_public Dekodierung (0/1 oder true/false)
+        if let boolValue = try? container.decode(Bool.self, forKey: .isPublic) {
+            isPublic = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .isPublic) {
+            isPublic = intValue != 0
+        } else {
+            isPublic = false // Fallback
+        }
+        
+        // Flexible is_active Dekodierung (0/1 oder true/false)
+        if let boolValue = try? container.decode(Bool.self, forKey: .isActive) {
+            isActive = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .isActive) {
+            isActive = intValue != 0
+        } else {
+            isActive = true // Fallback
+        }
         
         // Flexible voice_chat_active Dekodierung (0/1 oder true/false oder null)
         if let boolValue = try? container.decode(Bool.self, forKey: .voiceChatActive) {
@@ -152,6 +168,26 @@ struct VoiceChatParticipant: Codable, Identifiable {
         case profilePictureUrl = "profile_picture_url"
         case startedAt = "started_at"
         case isActive = "is_active"
+    }
+    
+    // Custom initializer für flexible is_active Dekodierung
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        userId = try container.decode(Int.self, forKey: .userId)
+        username = try container.decode(String.self, forKey: .username)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        profilePictureUrl = try container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
+        startedAt = try container.decode(String.self, forKey: .startedAt)
+        
+        // Flexible is_active Dekodierung (0/1 oder true/false)
+        if let boolValue = try? container.decode(Bool.self, forKey: .isActive) {
+            isActive = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .isActive) {
+            isActive = intValue != 0
+        } else {
+            isActive = true // Fallback
+        }
     }
 }
 
