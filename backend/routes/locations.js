@@ -110,20 +110,23 @@ router.post('/park', authenticateToken, async (req, res) => {
             });
         }
         
-        // Sende einen finalen Standort-Eintrag mit aktueller Position
-        // Das wird das Auto als "geparkt" markieren (älter als 5 Minuten)
+        // Markiere das Auto als geparkt durch Aktualisierung des is_active Status
+        // Anstatt einen neuen Standort-Eintrag zu erstellen
         const parkResult = await query(
-            `INSERT INTO locations 
-             (user_id, car_id, latitude, longitude, accuracy, speed, heading, altitude) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, actualCarId, null, null, null, null, null, null]
+            `UPDATE cars SET is_active = 0 WHERE id = ? AND user_id = ?`,
+            [actualCarId, userId]
         );
         
-        console.log('✅ Auto geparkt mit Location ID:', parkResult.insertId);
+        if (parkResult.affectedRows === 0) {
+            return res.status(404).json({
+                error: 'Fahrzeug nicht gefunden oder nicht berechtigt'
+            });
+        }
+        
+        console.log('✅ Auto geparkt - Status auf inaktiv gesetzt');
         
         res.json({
             message: 'Auto erfolgreich geparkt',
-            location_id: parkResult.insertId,
             timestamp: new Date().toISOString()
         });
         

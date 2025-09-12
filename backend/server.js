@@ -129,13 +129,19 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.2'
   });
 });
 
 // Socket.IO connection handling
 io.use(async (socket, next) => {
   try {
+    console.log('🔐 Socket.IO Auth: Handshake-Daten:', {
+      auth: socket.handshake.auth,
+      query: socket.handshake.query,
+      headers: socket.handshake.headers
+    });
+    
     // Token aus verschiedenen Quellen versuchen zu lesen
     let token = socket.handshake.auth.token || 
                 socket.handshake.query.token || 
