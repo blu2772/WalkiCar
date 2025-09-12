@@ -136,8 +136,16 @@ app.get('/api/health', (req, res) => {
 // Socket.IO connection handling
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token;
+    // Token aus verschiedenen Quellen versuchen zu lesen
+    let token = socket.handshake.auth.token || 
+                socket.handshake.query.token || 
+                socket.handshake.headers.authorization?.replace('Bearer ', '');
+    
     console.log('🔐 Socket.IO Auth: Token empfangen:', token ? 'Ja' : 'Nein');
+    console.log('🔐 Socket.IO Auth: Token-Quelle:', 
+      socket.handshake.auth.token ? 'auth' : 
+      socket.handshake.query.token ? 'query' : 
+      socket.handshake.headers.authorization ? 'header' : 'keine');
     
     if (!token) {
       console.log('❌ Socket.IO Auth: Kein Token vorhanden');

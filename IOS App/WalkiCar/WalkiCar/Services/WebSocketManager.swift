@@ -43,7 +43,9 @@ class WebSocketManager: ObservableObject {
         // Auth-Token hinzufügen falls verfügbar
         if let token = APIClient.shared.getAuthToken() {
             print("🔐 WebSocketManager: Auth-Token für Socket.IO gesetzt: \(token)")
+            // Token sowohl über auth als auch query senden für maximale Kompatibilität
             config.insert(.connectParams(["token": token]))
+            config.insert(.auth(["token": token]))
         } else {
             print("⚠️ WebSocketManager: Kein Auth-Token verfügbar für Socket.IO")
         }
