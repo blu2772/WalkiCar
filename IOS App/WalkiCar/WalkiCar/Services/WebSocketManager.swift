@@ -29,14 +29,26 @@ class WebSocketManager: ObservableObject {
             return
         }
         
-        manager = SocketManager(socketURL: url, config: [
+        // Auth-Token für WebSocket-Verbindung vorbereiten
+        var config: SocketIOClientConfiguration = [
             .log(true),  // Debug aktivieren
             .compress,
-            .forceWebsockets(true),
+            .forceWebsockets(false),  // WebSockets deaktivieren für bessere Kompatibilität
             .reconnects(true),
             .reconnectAttempts(5),
-            .reconnectWait(1000)
-        ])
+            .reconnectWait(2000),
+            .forceNew(true)
+        ]
+        
+        // Auth-Token hinzufügen falls verfügbar
+        if let token = APIClient.shared.getAuthToken() {
+            print("🔐 WebSocketManager: Auth-Token für Socket.IO gesetzt: \(token)")
+            config.insert(.connectParams(["token": token]))
+        } else {
+            print("⚠️ WebSocketManager: Kein Auth-Token verfügbar für Socket.IO")
+        }
+        
+        manager = SocketManager(socketURL: url, config: config)
         
         socket = manager?.defaultSocket
         
@@ -48,22 +60,31 @@ class WebSocketManager: ObservableObject {
         
         // Connection events
         socket.on(clientEvent: .connect) { [weak self] data, ack in
-            print("🔌 WebSocketManager: Verbunden")
+            print("🔌 WebSocketManager: Verbunden - Data: \(data)")
             DispatchQueue.main.async {
                 self?.isConnected = true
                 self?.connectionError = nil
+                
+                // Automatisch Benutzer-Raum beitreten nach Verbindung
+                if let userId = AuthManager.shared.currentUser?.id {
+                    print("👤 WebSocketManager: Automatisch Benutzer-Raum beitreten für User \(userId)")
+                    self?.joinUserRoom(userId: userId)
+                } else {
+                    print("❌ WebSocketManager: Kein Benutzer-ID verfügbar für Raum-Beitritt")
+                }
             }
         }
         
         socket.on(clientEvent: .disconnect) { [weak self] data, ack in
-            print("🔌 WebSocketManager: Getrennt")
+            print("🔌 WebSocketManager: Getrennt - Data: \(data)")
             DispatchQueue.main.async {
                 self?.isConnected = false
+                self?.connectionError = "Verbindung getrennt"
             }
         }
         
         socket.on(clientEvent: .error) { [weak self] data, ack in
-            print("❌ WebSocketManager: Verbindungsfehler")
+            print("❌ WebSocketManager: Verbindungsfehler - Data: \(data)")
             DispatchQueue.main.async {
                 self?.isConnected = false
                 self?.connectionError = "Verbindungsfehler"
@@ -113,7 +134,7 @@ class WebSocketManager: ObservableObject {
         
         // Voice Chat Events
         socket.on("user_joined_voice_chat") { [weak self] data, ack in
-            print("🎤 WebSocketManager: Benutzer ist Voice Chat beigetreten")
+            print("🎤 WebSocketManager: Benutzer ist Voice Chat beigetreten - Data: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("UserJoinedVoiceChat"),
@@ -123,7 +144,7 @@ class WebSocketManager: ObservableObject {
         }
         
         socket.on("user_left_voice_chat") { [weak self] data, ack in
-            print("🎤 WebSocketManager: Benutzer hat Voice Chat verlassen")
+            print("🎤 WebSocketManager: Benutzer hat Voice Chat verlassen - Data: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("UserLeftVoiceChat"),
@@ -209,13 +230,30 @@ class WebSocketManager: ObservableObject {
             return
         }
         
-        // Auth-Token setzen falls verfügbar
+        // Auth-Token für Verbindung aktualisieren
         if let token = APIClient.shared.getAuthToken() {
-            print("🔐 WebSocketManager: Auth-Token gesetzt für Verbindung")
+            print("🔐 WebSocketManager: Auth-Token für Verbindung aktualisiert: \(token)")
+            // Socket.IO connectParams werden bei der Initialisierung gesetzt
+            // Hier können wir nur bestätigen, dass das Token verfügbar ist
+        } else {
+            print("⚠️ WebSocketManager: Kein Auth-Token verfügbar für Verbindung")
         }
         
         print("🔌 WebSocketManager: Verbinde...")
+        
+        // Verbindung mit Timeout und Retry-Logik
         socket.connect()
+        
+        // Fallback: Nach 3 Sekunden nochmal versuchen
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            if !(self?.isConnected ?? false) {
+                print("🔄 WebSocketManager: Verbindung fehlgeschlagen - versuche erneut...")
+                socket.disconnect()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    socket.connect()
+                }
+            }
+        }
     }
     
     func disconnect() {
@@ -339,8 +377,8 @@ class WebSocketManager: ObservableObject {
     }
     
     func joinUserRoom(userId: Int) {
-        guard let socket = socket, isConnected else {
-            print("❌ WebSocketManager: Socket nicht verbunden")
+        guard let socket = socket else {
+            print("❌ WebSocketManager: Socket nicht verfügbar für joinUserRoom")
             return
         }
         
@@ -348,8 +386,10 @@ class WebSocketManager: ObservableObject {
             "userId": userId
         ]
         
-        socket.emit("join_user_room", data)
-        print("👤 WebSocketManager: Benutzer-Raum beigetreten für User \(userId)")
+        print("👤 WebSocketManager: Trete Benutzer-Raum bei für User \(userId)")
+        socket.emit("join_user_room", data) { [weak self] in
+            print("✅ WebSocketManager: join_user_room Event gesendet für User \(userId)")
+        }
     }
     
     // MARK: - WebRTC Signaling Methods

@@ -134,17 +134,104 @@ app.get('/api/health', (req, res) => {
 });
 
 // Socket.IO connection handling
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (!token) {
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    console.log('🔐 Socket.IO Auth: Token empfangen:', token ? 'Ja' : 'Nein');
+    
+    if (!token) {
+      console.log('❌ Socket.IO Auth: Kein Token vorhanden');
+      return next(new Error('Authentication error'));
+    }
+
+    // JWT Token verifizieren
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Socket.IO Auth: Token verifiziert für User ID:', decoded.userId);
+
+    // Benutzer in der Datenbank überprüfen
+    const { query } = require('./config/database');
+    const user = await query(
+      'SELECT id, username, display_name, is_active FROM users WHERE id = ? AND is_active = TRUE',
+      [decoded.userId]
+    );
+
+    if (user.length === 0) {
+      console.log('❌ Socket.IO Auth: Benutzer nicht gefunden oder inaktiv');
+      return next(new Error('Authentication error'));
+    }
+
+    // Benutzer-Daten an Socket anhängen
+    socket.userId = decoded.userId;
+    socket.user = user[0];
+    console.log('✅ Socket.IO Auth: Benutzer authentifiziert:', socket.user.username);
+    
+    next();
+  } catch (error) {
+    console.log('❌ Socket.IO Auth: Fehler:', error.message);
+    if (error.name === 'TokenExpiredError') {
+      return next(new Error('Token expired'));
+    } else if (error.name === 'JsonWebTokenError') {
+      return next(new Error('Invalid token'));
+    }
     return next(new Error('Authentication error'));
   }
-  // TODO: Verify JWT token here
-  next();
 });
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('🔌 Socket.IO: Benutzer verbunden:', socket.id, 'User:', socket.user?.username);
+  
+  // Benutzer-Raum beitreten
+  socket.on('join_user_room', async (data) => {
+    try {
+      const { userId } = data;
+      
+      // Join user-specific room for direct communication
+      socket.join(`user_${userId}`);
+      console.log(`👤 Socket.IO: User ${socket.id} joined user room for user ${userId}`);
+    } catch (error) {
+      console.error('❌ Socket.IO: Error joining user room:', error);
+    }
+  });
+
+  // Gruppen-Raum beitreten
+  socket.on('join_group_room', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Join group-specific room
+      socket.join(`group_${groupId}`);
+      console.log(`👥 Socket.IO: User ${socket.id} joined group room ${groupId}`);
+    } catch (error) {
+      console.error('❌ Socket.IO: Error joining group room:', error);
+    }
+  });
+
+  // Voice Chat beitreten
+  socket.on('join_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Join voice chat room
+      socket.join(`voice_chat_${groupId}`);
+      console.log(`🎤 Socket.IO: User ${socket.id} joined voice chat for group ${groupId}`);
+    } catch (error) {
+      console.error('❌ Socket.IO: Error joining voice chat:', error);
+    }
+  });
+
+  // Voice Chat verlassen
+  socket.on('leave_group_voice_chat', async (data) => {
+    try {
+      const { userId, groupId } = data;
+      
+      // Leave voice chat room
+      socket.leave(`voice_chat_${groupId}`);
+      console.log(`🎤 Socket.IO: User ${socket.id} left voice chat for group ${groupId}`);
+    } catch (error) {
+      console.error('❌ Socket.IO: Error leaving voice chat:', error);
+    }
+  });
   
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
@@ -157,7 +244,7 @@ io.on('connection', (socket) => {
   });
   
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('🔌 Socket.IO: Benutzer getrennt:', socket.id);
   });
   
   // Location tracking events
