@@ -220,7 +220,7 @@ class WebSocketManager: ObservableObject {
         
         // WebRTC Signaling Events
         socket.on("webrtc_offer") { [weak self] data, ack in
-            print("🎤 WebSocketManager: WebRTC Offer erhalten")
+            print("🎤 WebSocketManager: WebRTC Offer erhalten - Data: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("WebRTCOffer"),
@@ -230,7 +230,7 @@ class WebSocketManager: ObservableObject {
         }
         
         socket.on("webrtc_answer") { [weak self] data, ack in
-            print("🎤 WebSocketManager: WebRTC Answer erhalten")
+            print("🎤 WebSocketManager: WebRTC Answer erhalten - Data: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("WebRTCAnswer"),
@@ -240,7 +240,7 @@ class WebSocketManager: ObservableObject {
         }
         
         socket.on("webrtc_ice_candidate") { [weak self] data, ack in
-            print("🎤 WebSocketManager: WebRTC ICE Candidate erhalten")
+            print("🎤 WebSocketManager: WebRTC ICE Candidate erhalten - Data: \(data)")
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("WebRTCIceCandidate"),

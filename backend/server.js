@@ -16,6 +16,9 @@ const carRoutes = require('./routes/cars');
 const groupRoutes = require('./routes/groups');
 const locationRoutes = require('./routes/locations');
 
+// TURN Credentials Generator
+const crypto = require('crypto');
+
 const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 
@@ -123,6 +126,45 @@ app.use('/api/friends', authenticateToken, friendRoutes);
 app.use('/api/cars', authenticateToken, carRoutes);
 app.use('/api/groups', authenticateToken, groupRoutes);
 app.use('/api/locations', authenticateToken, locationRoutes);
+
+// TURN Credentials Route
+app.get('/api/turn-credentials', authenticateToken, (req, res) => {
+  try {
+    // TURN Server Konfiguration
+    const TURN_SERVER = 'walkcar.timrmp.de';
+    const TURN_PORT = 3478;
+    const TURN_TLS_PORT = 5349;
+    const TURN_SECRET = 'walkcar123'; // Sollte in .env stehen
+    
+    // Dynamische Credentials generieren (24h gültig)
+    const username = Math.floor(Date.now() / 1000) + ':walkcar';
+    const credential = crypto.createHmac('sha1', TURN_SECRET).update(username).digest('base64');
+    
+    const iceServers = [
+      {
+        urls: [`stun:${TURN_SERVER}:${TURN_PORT}`]
+      },
+      {
+        urls: [`turn:${TURN_SERVER}:${TURN_PORT}`],
+        username: username,
+        credential: credential
+      },
+      {
+        urls: [`turns:${TURN_SERVER}:${TURN_TLS_PORT}`],
+        username: username,
+        credential: credential
+      }
+    ];
+    
+    res.json({
+      iceServers: iceServers,
+      ttl: 86400 // 24 Stunden
+    });
+  } catch (error) {
+    console.error('TURN Credentials Error:', error);
+    res.status(500).json({ error: 'Failed to generate TURN credentials' });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

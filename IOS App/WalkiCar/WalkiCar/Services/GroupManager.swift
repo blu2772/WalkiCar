@@ -195,6 +195,11 @@ class GroupManager: ObservableObject {
                         
                         // Audio Level Monitoring starten
                         self.startAudioLevelMonitoring()
+                        
+                        // Nach kurzer Verzögerung: Prüfe auf bereits vorhandene Teilnehmer
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.connectToExistingParticipants(groupId: groupId)
+                        }
                     } else {
                         self.errorMessage = response.message
                     }
@@ -396,6 +401,17 @@ class GroupManager: ObservableObject {
     
     private func handleUserJoinedVoiceChat(groupId: Int, userId: Int) {
         print("👥 GroupManager: Benutzer \(userId) ist Voice Chat beigetreten für Gruppe \(groupId)")
+        
+        // Prüfe ob wir selbst im Voice Chat sind
+        if isInVoiceChat && currentVoiceChatGroup?.id == groupId {
+            // Füge neuen Teilnehmer zur WebRTC Verbindung hinzu
+            print("🎤 GroupManager: Füge neuen Teilnehmer \(userId) zur WebRTC Verbindung hinzu")
+            webRTCPeerManager.addParticipant(userId: userId)
+        } else {
+            print("🎤 GroupManager: Wir sind nicht im Voice Chat oder es ist nicht unsere Gruppe")
+            print("🎤 GroupManager: isInVoiceChat: \(isInVoiceChat), currentGroup: \(currentVoiceChatGroup?.id ?? -1), targetGroup: \(groupId)")
+        }
+        
         // Aktualisiere Voice Chat Status für die Gruppe
         loadVoiceChatStatus(groupId: groupId)
     }
@@ -445,6 +461,30 @@ class GroupManager: ObservableObject {
     private func startAudioLevelMonitoring() {
         // Audio Level wird automatisch vom WebRTCAudioEngine aktualisiert
         // Hier könnten wir zusätzliche Monitoring-Logik hinzufügen
+    }
+    
+    private func connectToExistingParticipants(groupId: Int) {
+        print("🎤 GroupManager: Verbinde mit bereits vorhandenen Teilnehmern für Gruppe \(groupId)")
+        
+        // Lade Voice Chat Status um andere Teilnehmer zu finden
+        Task {
+            do {
+                let status = try await apiClient.getGroupVoiceChatStatus(groupId: groupId)
+                
+                await MainActor.run {
+                    // Erstelle Peer Connections für alle anderen Teilnehmer
+                    for participant in status.participants {
+                        if let currentUserId = AuthManager.shared.currentUser?.id,
+                           participant.userId != currentUserId {
+                            print("🎤 GroupManager: Erstelle Peer Connection für bereits vorhandenen Teilnehmer \(participant.userId)")
+                            webRTCPeerManager.addParticipant(userId: participant.userId)
+                        }
+                    }
+                }
+            } catch {
+                print("❌ GroupManager: Fehler beim Laden der Teilnehmer für Peer Connections: \(error)")
+            }
+        }
     }
     
     deinit {

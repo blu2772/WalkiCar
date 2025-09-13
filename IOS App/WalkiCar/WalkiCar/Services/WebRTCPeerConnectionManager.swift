@@ -79,7 +79,17 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
     }
     
     func addParticipant(userId: Int) {
-        guard let groupId = currentGroupId else { return }
+        guard let groupId = currentGroupId,
+              let localUserId = localUserId else { 
+            print("❌ WebRTCPeerConnectionManager: Keine Gruppe oder User-ID für addParticipant")
+            return 
+        }
+        
+        // Prüfe ob bereits eine Verbindung existiert
+        if activeConnections[userId] != nil {
+            print("🎤 WebRTCPeerConnectionManager: Verbindung zu User \(userId) bereits vorhanden")
+            return
+        }
         
         print("🎤 WebRTCPeerConnectionManager: Füge Teilnehmer \(userId) hinzu")
         
@@ -89,11 +99,17 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
             
             // Create offer
             audioEngine.createOffer(for: userId, groupId: groupId) { [weak self] offer in
-                guard let offer = offer else { return }
+                guard let offer = offer else { 
+                    print("❌ WebRTCPeerConnectionManager: Kein Offer erstellt für neuen Teilnehmer \(userId)")
+                    return 
+                }
                 
+                print("🎤 WebRTCPeerConnectionManager: Sende Offer an neuen Teilnehmer \(userId)")
                 // Send offer via WebSocket
                 self?.sendOffer(to: userId, offer: offer, groupId: groupId)
             }
+        } else {
+            print("❌ WebRTCPeerConnectionManager: Peer Connection für User \(userId) konnte nicht erstellt werden")
         }
     }
     
@@ -199,28 +215,62 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         print("🎤 WebRTCPeerConnectionManager: Erhalte Offer von User \(userId)")
         
         guard let groupId = currentGroupId,
-              let localUserId = localUserId else { return }
+              let localUserId = localUserId else { 
+            print("❌ WebRTCPeerConnectionManager: Keine Gruppe oder User-ID für Offer")
+            return 
+        }
         
         // Create peer connection if it doesn't exist
         if activeConnections[userId] == nil {
+            print("🎤 WebRTCPeerConnectionManager: Erstelle Peer Connection für User \(userId)")
             if audioEngine.createPeerConnection(for: userId, groupId: groupId) != nil {
                 activeConnections[userId] = .connecting
+            } else {
+                print("❌ WebRTCPeerConnectionManager: Peer Connection für User \(userId) konnte nicht erstellt werden")
+                return
             }
         }
         
         // Create RTCSessionDescription from offer data
-        guard let sdp = offerData["sdp"] as? String,
-              let typeString = offerData["type"] as? String else { return }
+        guard let sdp = offerData["sdp"] as? String else { 
+            print("❌ WebRTCPeerConnectionManager: Ungültige Offer-Daten - SDP fehlt")
+            print("❌ WebRTCPeerConnectionManager: Offer-Daten: \(offerData)")
+            return 
+        }
         
+        // Handle both string and integer type values
         let type: RTCSdpType
-        switch typeString {
-        case "offer":
-            type = .offer
-        case "answer":
-            type = .answer
-        case "pranswer":
-            type = .prAnswer
-        default:
+        if let typeString = offerData["type"] as? String {
+            // Type is a string
+            switch typeString {
+            case "offer":
+                type = .offer
+            case "answer":
+                type = .answer
+            case "pranswer":
+                type = .prAnswer
+            default:
+                print("❌ WebRTCPeerConnectionManager: Unbekannter SDP Typ (String): \(typeString)")
+                return
+            }
+        } else if let typeInt = offerData["type"] as? Int {
+            // Type is an integer (0=offer, 1=answer, 2=pranswer)
+            switch typeInt {
+            case 0:
+                type = .offer
+            case 1:
+                type = .answer
+            case 2:
+                type = .prAnswer
+            default:
+                print("❌ WebRTCPeerConnectionManager: Unbekannter SDP Typ (Int): \(typeInt)")
+                return
+            }
+        } else {
+            print("❌ WebRTCPeerConnectionManager: Ungültige Offer-Daten - Type fehlt")
+            print("❌ WebRTCPeerConnectionManager: Offer-Daten: \(offerData)")
+            print("❌ WebRTCPeerConnectionManager: SDP: \(offerData["sdp"] ?? "nil")")
+            print("❌ WebRTCPeerConnectionManager: Type: \(offerData["type"] ?? "nil")")
             return
         }
         
@@ -228,8 +278,13 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         
         // Create answer
         audioEngine.createAnswer(for: userId, offer: offer) { [weak self] answer in
-            guard let answer = answer else { return }
+            guard let answer = answer else { 
+                print("❌ WebRTCPeerConnectionManager: Kein Answer erstellt für User \(userId)")
+                return 
+            }
             
+            print("🎤 WebRTCPeerConnectionManager: Answer erstellt für User \(userId)")
+            print("🎤 WebRTCPeerConnectionManager: Sende Answer an User \(userId)")
             // Send answer via WebSocket
             self?.sendAnswer(to: userId, answer: answer, groupId: groupId)
         }
@@ -239,27 +294,63 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         print("🎤 WebRTCPeerConnectionManager: Erhalte Answer von User \(userId)")
         
         // Create RTCSessionDescription from answer data
-        guard let sdp = answerData["sdp"] as? String,
-              let typeString = answerData["type"] as? String else { return }
+        guard let sdp = answerData["sdp"] as? String else { 
+            print("❌ WebRTCPeerConnectionManager: Ungültige Answer-Daten - SDP fehlt")
+            return 
+        }
         
+        // Handle both string and integer type values
         let type: RTCSdpType
-        switch typeString {
-        case "offer":
-            type = .offer
-        case "answer":
-            type = .answer
-        case "pranswer":
-            type = .prAnswer
-        default:
+        if let typeString = answerData["type"] as? String {
+            // Type is a string
+            switch typeString {
+            case "offer":
+                type = .offer
+            case "answer":
+                type = .answer
+            case "pranswer":
+                type = .prAnswer
+            default:
+                print("❌ WebRTCPeerConnectionManager: Unbekannter SDP Typ (String): \(typeString)")
+                return
+            }
+        } else if let typeInt = answerData["type"] as? Int {
+            // Type is an integer (0=offer, 1=answer, 2=pranswer)
+            switch typeInt {
+            case 0:
+                type = .offer
+            case 1:
+                type = .answer
+            case 2:
+                type = .prAnswer
+            default:
+                print("❌ WebRTCPeerConnectionManager: Unbekannter SDP Typ (Int): \(typeInt)")
+                return
+            }
+        } else {
+            print("❌ WebRTCPeerConnectionManager: Ungültige Answer-Daten - Type fehlt")
             return
         }
         
         let answer = RTCSessionDescription(type: type, sdp: sdp)
         
         // Set remote description
-        // Note: We need to access peerConnections through audioEngine
-        // This is a simplified approach - in a real implementation, you'd need proper access
-        print("✅ WebRTCPeerConnectionManager: Answer verarbeitet für User \(userId)")
+        guard let peerConnection = audioEngine.peerConnections[userId] else {
+            print("❌ WebRTCPeerConnectionManager: Keine Peer Connection für User \(userId)")
+            return
+        }
+        
+        peerConnection.setRemoteDescription(answer) { error in
+            if let error = error {
+                print("❌ WebRTCPeerConnectionManager: Set Remote Description Fehler: \(error)")
+            } else {
+                print("✅ WebRTCPeerConnectionManager: Answer verarbeitet für User \(userId)")
+                // Update connection state
+                DispatchQueue.main.async {
+                    self.activeConnections[userId] = .connected
+                }
+            }
+        }
     }
     
     private func handleIncomingIceCandidate(from userId: Int, groupId: Int, candidateData: [String: Any]) {
@@ -268,12 +359,16 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         // Create RTCIceCandidate from candidate data
         guard let candidate = candidateData["candidate"] as? String,
               let sdpMLineIndex = candidateData["sdpMLineIndex"] as? Int32,
-              let sdpMid = candidateData["sdpMid"] as? String else { return }
+              let sdpMid = candidateData["sdpMid"] as? String else { 
+            print("❌ WebRTCPeerConnectionManager: Ungültige ICE Candidate Daten")
+            return 
+        }
         
         let iceCandidate = RTCIceCandidate(sdp: candidate, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
         
-        // Add ICE candidate
+        // Add ICE candidate - this will be queued if remote description is not set yet
         audioEngine.addIceCandidate(for: userId, candidate: iceCandidate)
+        print("✅ WebRTCPeerConnectionManager: ICE Candidate hinzugefügt für User \(userId)")
     }
     
     private func handleIncomingEndCall(from userId: Int, groupId: Int) {
