@@ -217,16 +217,36 @@ class GroupManager: ObservableObject {
                         // Voice Chat Status aktualisieren
                         self.updateGroupVoiceChatStatus(groupId: groupId, isActive: false)
                         
-                        // WebSocket Room verlassen
-                        if let userId = AuthManager.shared.currentUser?.id {
-                            self.webSocketManager.leaveGroupVoiceChat(userId: userId, groupId: groupId)
-                            
-                            // WebRTC Voice Chat stoppen
-                            self.webRTCPeerManager.stopVoiceChat()
-                        }
+                        // WebRTC Voice Chat stoppen
+                        self.webRTCPeerManager.stopVoiceChat()
                         
                         // Audio Engine stoppen
                         self.audioEngine.stopAudio()
+                        
+                        // WebSocket Room verlassen - mit Verzögerung damit Leave-Events empfangen werden
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            if let userId = AuthManager.shared.currentUser?.id {
+                                self.webSocketManager.leaveGroupVoiceChat(userId: userId, groupId: groupId)
+                            } else {
+                                // Fallback: User-ID aus Token extrahieren
+                                if let token = APIClient.shared.getAuthToken() {
+                                    let parts = token.split(separator: ".")
+                                    if parts.count >= 2 {
+                                        let payload = String(parts[1])
+                                        if let data = Data(base64Encoded: payload + "==") {
+                                            do {
+                                                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                                                   let userId = json["userId"] as? Int {
+                                                    self.webSocketManager.leaveGroupVoiceChat(userId: userId, groupId: groupId)
+                                                }
+                                            } catch {
+                                                print("❌ GroupManager: Fehler beim Dekodieren des Tokens für Leave: \(error)")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         self.isAudioConnected = false
                         self.audioLevel = 0.0
                         

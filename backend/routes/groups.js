@@ -329,6 +329,15 @@ router.post('/:groupId/voice/join', async (req, res) => {
         username: req.user.username,
         displayName: req.user.display_name
       });
+      
+      // Zusätzlich: Sende Event an Voice Chat Raum
+      console.log(`🎤 Sende user_joined_voice_chat Event an Voice Chat Raum voice_chat_${groupId}`);
+      io.to(`voice_chat_${groupId}`).emit('user_joined_voice_chat', {
+        groupId: parseInt(groupId),
+        userId: userId,
+        username: req.user.username,
+        displayName: req.user.display_name
+      });
     } else {
       console.log('❌ Socket.IO nicht verfügbar für user_joined_voice_chat Event');
     }
@@ -410,6 +419,15 @@ router.post('/:groupId/voice/leave', async (req, res) => {
       // Zusätzlich: Sende Event an Gruppen-Raum
       console.log(`🎤 Sende user_left_voice_chat Event an Gruppen-Raum group_${groupId}`);
       io.to(`group_${groupId}`).emit('user_left_voice_chat', {
+        groupId: parseInt(groupId),
+        userId: userId,
+        username: req.user.username,
+        displayName: req.user.display_name
+      });
+      
+      // Zusätzlich: Sende Event an Voice Chat Raum
+      console.log(`🎤 Sende user_left_voice_chat Event an Voice Chat Raum voice_chat_${groupId}`);
+      io.to(`voice_chat_${groupId}`).emit('user_left_voice_chat', {
         groupId: parseInt(groupId),
         userId: userId,
         username: req.user.username,
