@@ -28,7 +28,27 @@ class AuthManager: NSObject, ObservableObject {
     func checkAuthenticationStatus() {
         isAuthenticated = apiClient.isAuthenticated
         if isAuthenticated {
-            // TODO: Load user profile
+            // Lade User-Profil wenn eingeloggt
+            loadUserProfile()
+        }
+    }
+    
+    private func loadUserProfile() {
+        print("🔍 AuthManager: Starte User-Profil laden...")
+        Task {
+            do {
+                let user = try await apiClient.getCurrentUser()
+                await MainActor.run {
+                    self.currentUser = user
+                    print("✅ AuthManager: User-Profil geladen: \(user.username) (ID: \(user.id))")
+                }
+            } catch {
+                print("❌ AuthManager: Fehler beim Laden des User-Profils: \(error)")
+                // Bei Fehler: Logout durchführen
+                await MainActor.run {
+                    self.logout()
+                }
+            }
         }
     }
     

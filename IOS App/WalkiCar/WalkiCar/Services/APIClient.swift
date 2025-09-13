@@ -70,6 +70,16 @@ class APIClient: ObservableObject {
         )
     }
     
+    func getCurrentUser() async throws -> User {
+        return try await makeRequest(
+            endpoint: "/users/profile",
+            method: "GET",
+            body: Optional<[String: String]>.none,
+            responseType: User.self,
+            requiresAuth: true
+        )
+    }
+    
     // MARK: - Email/Password Authentication
     
     func registerWithEmail(email: String, username: String, displayName: String, password: String) async throws -> AuthResponse {

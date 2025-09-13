@@ -452,7 +452,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     }
     
     private func loadTurnCredentials(completion: @escaping ([RTCIceServer]) -> Void) {
-        guard let token = AuthManager.shared.authToken else {
+        guard let token = APIClient.shared.getAuthToken() else {
             print("❌ WebRTCAudioEngine: Kein Auth Token für TURN Credentials")
             completion([])
             return

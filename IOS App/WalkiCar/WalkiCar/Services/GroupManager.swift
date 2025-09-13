@@ -197,7 +197,8 @@ class GroupManager: ObservableObject {
                         self.startAudioLevelMonitoring()
                         
                         // Nach kurzer Verzögerung: Prüfe auf bereits vorhandene Teilnehmer
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // Warte bis User-Profil geladen ist oder verwende Token-Fallback
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             self.connectToExistingParticipants(groupId: groupId)
                         }
                     } else {
@@ -466,18 +467,60 @@ class GroupManager: ObservableObject {
     private func connectToExistingParticipants(groupId: Int) {
         print("🎤 GroupManager: Verbinde mit bereits vorhandenen Teilnehmern für Gruppe \(groupId)")
         
+        // Debug: Prüfe AuthManager Status
+        print("🔍 GroupManager: AuthManager Status:")
+        print("   - isAuthenticated: \(AuthManager.shared.isAuthenticated)")
+        print("   - currentUser: \(AuthManager.shared.currentUser?.username ?? "nil")")
+        print("   - currentUser ID: \(AuthManager.shared.currentUser?.id ?? -1)")
+        
+        // Debug: Prüfe Token
+        if let token = APIClient.shared.getAuthToken() {
+            print("🔍 GroupManager: Auth Token verfügbar: \(String(token.prefix(20)))...")
+        } else {
+            print("❌ GroupManager: Kein Auth Token verfügbar!")
+        }
+        
         // Lade Voice Chat Status um andere Teilnehmer zu finden
         Task {
             do {
                 let status = try await apiClient.getGroupVoiceChatStatus(groupId: groupId)
+                print("🔍 GroupManager: Voice Chat Status geladen - \(status.participants.count) Teilnehmer")
                 
                 await MainActor.run {
                     // Erstelle Peer Connections für alle anderen Teilnehmer
                     for participant in status.participants {
-                        if let currentUserId = AuthManager.shared.currentUser?.id,
+                        print("🔍 GroupManager: Prüfe Teilnehmer \(participant.userId) (\(participant.username))")
+                        
+                        // Versuche User-ID aus AuthManager zu bekommen, falls nicht verfügbar aus Token extrahieren
+                        var currentUserId: Int?
+                        
+                        if let userId = AuthManager.shared.currentUser?.id {
+                            currentUserId = userId
+                            print("✅ GroupManager: User-ID aus AuthManager: \(userId)")
+                        } else {
+                            print("⚠️ GroupManager: currentUser ist nil, verwende Token-Fallback")
+                            // Fallback: User-ID aus Token extrahieren
+                            if let token = APIClient.shared.getAuthToken() {
+                                do {
+                                    let payload = try decodeJWT(token: token)
+                                    if let userId = payload["userId"] as? Int {
+                                        currentUserId = userId
+                                        print("✅ GroupManager: User-ID aus Token extrahiert für Peer Connections: \(userId)")
+                                    }
+                                } catch {
+                                    print("❌ GroupManager: Fehler beim Dekodieren des Tokens für Peer Connections: \(error)")
+                                }
+                            }
+                        }
+                        
+                        if let currentUserId = currentUserId,
                            participant.userId != currentUserId {
                             print("🎤 GroupManager: Erstelle Peer Connection für bereits vorhandenen Teilnehmer \(participant.userId)")
                             webRTCPeerManager.addParticipant(userId: participant.userId)
+                        } else if let currentUserId = currentUserId {
+                            print("ℹ️ GroupManager: Überspringe eigenen User \(currentUserId)")
+                        } else {
+                            print("❌ GroupManager: Keine User-ID verfügbar - kann keine Peer Connections erstellen")
                         }
                     }
                 }
@@ -485,6 +528,34 @@ class GroupManager: ObservableObject {
                 print("❌ GroupManager: Fehler beim Laden der Teilnehmer für Peer Connections: \(error)")
             }
         }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func decodeJWT(token: String) throws -> [String: Any] {
+        let parts = token.components(separatedBy: ".")
+        guard parts.count == 3 else {
+            throw NSError(domain: "JWTError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid JWT format"])
+        }
+        
+        let payload = parts[1]
+        
+        // Base64 URL decode
+        var base64 = payload
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        
+        // Add padding if needed
+        while base64.count % 4 != 0 {
+            base64 += "="
+        }
+        
+        guard let data = Data(base64Encoded: base64),
+              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(domain: "JWTError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode JWT payload"])
+        }
+        
+        return json
     }
     
     deinit {
