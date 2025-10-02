@@ -23,7 +23,11 @@
     "stop:coturn": "sudo systemctl stop coturn",
     "restart:coturn": "sudo systemctl restart coturn",
     "status:coturn": "sudo systemctl status coturn",
-    "manage:coturn": "node coturn-manager.js"
+    "manage:coturn": "node coturn-manager.js",
+    "server:coturn": "node server-coturn-manager.js",
+    "coturn:status": "node server-coturn-manager.js status",
+    "coturn:info": "node server-coturn-manager.js info",
+    "coturn:sudoers": "node server-coturn-manager.js sudoers"
   },
   "keywords": [
     "walkicar",

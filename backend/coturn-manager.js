@@ -31,11 +31,11 @@ class CoturnManager {
       let stdout = '';
       let stderr = '';
 
-      process.stdout.on('data').on('data', (data)) => {
+      process.stdout.on('data', (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data').on('data', (data)) => {
+      process.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
