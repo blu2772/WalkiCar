@@ -28,8 +28,20 @@ class AuthManager: NSObject, ObservableObject {
     func checkAuthenticationStatus() {
         isAuthenticated = apiClient.isAuthenticated
         if isAuthenticated {
-            // Lade User-Profil wenn eingeloggt
-            loadUserProfile()
+            // Prüfe ob Token erneuert werden muss
+            Task {
+                do {
+                    try await apiClient.refreshTokenIfNeeded()
+                    await MainActor.run {
+                        self.loadUserProfile()
+                    }
+                } catch {
+                    print("❌ AuthManager: Token-Erneuerung fehlgeschlagen: \(error)")
+                    await MainActor.run {
+                        self.logout()
+                    }
+                }
+            }
         }
     }
     
@@ -116,14 +128,16 @@ class AuthManager: NSObject, ObservableObject {
         Task {
             do {
                 try await apiClient.logout()
-                await MainActor.run {
-                    isAuthenticated = false
-                    currentUser = nil
-                }
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                }
+                print("⚠️ AuthManager: Logout-Fehler (ignoriert): \(error)")
+            }
+            
+            await MainActor.run {
+                // Token wird bereits in apiClient.logout() gelöscht
+                isAuthenticated = false
+                currentUser = nil
+                errorMessage = nil
+                print("✅ AuthManager: Logout erfolgreich")
             }
         }
     }

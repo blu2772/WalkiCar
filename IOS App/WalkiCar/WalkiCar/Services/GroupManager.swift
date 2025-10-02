@@ -24,6 +24,10 @@ class GroupManager: ObservableObject {
     private let webRTCPeerManager = WebRTCPeerConnectionManager.shared
     private let audioEngine = WebRTCAudioEngine.shared
     
+    // Rate Limiting für API-Aufrufe
+    private var lastVoiceChatStatusLoad: [Int: Date] = [:]
+    private let voiceChatStatusLoadInterval: TimeInterval = 2.0 // Mindestens 2 Sekunden zwischen Aufrufen
+    
     var activeGroupsCount: Int {
         groups.filter { $0.isActive }.count
     }
@@ -275,6 +279,20 @@ class GroupManager: ObservableObject {
     }
     
     func loadVoiceChatStatus(groupId: Int) {
+        // Rate Limiting: Prüfe ob letzter Aufruf zu kurz her ist
+        if let lastLoad = lastVoiceChatStatusLoad[groupId] {
+            let timeSinceLastLoad = Date().timeIntervalSince(lastLoad)
+            if timeSinceLastLoad < voiceChatStatusLoadInterval {
+                print("⚠️ GroupManager: Rate Limiting - Voice Chat Status für Gruppe \(groupId) wurde vor \(timeSinceLastLoad)s geladen, überspringe")
+                return
+            }
+        }
+        
+        // Aktualisiere Zeitstempel
+        lastVoiceChatStatusLoad[groupId] = Date()
+        
+        print("🌐 GroupManager: Lade Voice Chat Status für Gruppe \(groupId)")
+        
         Task {
             do {
                 let status = try await apiClient.getGroupVoiceChatStatus(groupId: groupId)
@@ -405,15 +423,30 @@ class GroupManager: ObservableObject {
         
         // Prüfe ob wir selbst im Voice Chat sind
         if isInVoiceChat && currentVoiceChatGroup?.id == groupId {
-            // Füge neuen Teilnehmer zur WebRTC Verbindung hinzu
-            print("🎤 GroupManager: Füge neuen Teilnehmer \(userId) zur WebRTC Verbindung hinzu")
-            webRTCPeerManager.addParticipant(userId: userId)
+            // Prüfe ob es ein Reconnect ist (User war bereits im Voice Chat)
+            let wasAlreadyInChat = voiceChatParticipants.contains { $0.userId == userId }
+            
+            if wasAlreadyInChat {
+                print("🔄 GroupManager: Reconnect erkannt für User \(userId) - führe Reset durch")
+                // Reset für Reconnect
+                webRTCPeerManager.resetForReconnect()
+                
+                // Kurze Pause für saubere Trennung
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    print("🎤 GroupManager: Füge User \(userId) nach Reset zur WebRTC Verbindung hinzu")
+                    self.webRTCPeerManager.addParticipant(userId: userId)
+                }
+            } else {
+                // Füge neuen Teilnehmer zur WebRTC Verbindung hinzu
+                print("🎤 GroupManager: Füge neuen Teilnehmer \(userId) zur WebRTC Verbindung hinzu")
+                webRTCPeerManager.addParticipant(userId: userId)
+            }
         } else {
             print("🎤 GroupManager: Wir sind nicht im Voice Chat oder es ist nicht unsere Gruppe")
             print("🎤 GroupManager: isInVoiceChat: \(isInVoiceChat), currentGroup: \(currentVoiceChatGroup?.id ?? -1), targetGroup: \(groupId)")
         }
         
-        // Aktualisiere Voice Chat Status für die Gruppe
+        // Aktualisiere Voice Chat Status für die Gruppe (mit Rate Limiting)
         loadVoiceChatStatus(groupId: groupId)
     }
     
@@ -422,7 +455,7 @@ class GroupManager: ObservableObject {
         // Entferne Benutzer aus Voice Chat Teilnehmern
         voiceChatParticipants.removeAll { $0.userId == userId }
         
-        // Aktualisiere Gruppen-Status
+        // Aktualisiere Gruppen-Status (mit Rate Limiting)
         loadVoiceChatStatus(groupId: groupId)
     }
     

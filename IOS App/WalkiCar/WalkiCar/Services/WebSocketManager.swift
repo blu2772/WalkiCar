@@ -21,6 +21,22 @@ class WebSocketManager: ObservableObject {
     // MARK: - Initialization
     private init() {
         setupSocket()
+        setupTokenUpdateListener()
+    }
+    
+    private func setupTokenUpdateListener() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("AuthTokenUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            print("🔄 WebSocketManager: Token wurde aktualisiert, rekonfiguriere WebSocket...")
+            self?.reconfigureWithNewToken()
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupSocket() {
@@ -46,8 +62,7 @@ class WebSocketManager: ObservableObject {
         
         // Auth-Token hinzufügen falls verfügbar
         if let token = APIClient.shared.getAuthToken() {
-            print("🔐 WebSocketManager: Auth-Token für Socket.IO gesetzt: \(token)")
-            print("🔍 WebSocketManager: DEBUG - Server sollte gestoppt sein, aber Socket.IO antwortet noch!")
+            print("🔐 WebSocketManager: Auth-Token für Socket.IO gesetzt")
             // Token über connectParams senden (wird als Query-Parameter übertragen)
             config.insert(.connectParams(["token": token]))
         } else {
@@ -299,6 +314,14 @@ class WebSocketManager: ObservableObject {
         
         print("🔌 WebSocketManager: Trenne Verbindung...")
         socket.disconnect()
+    }
+    
+    // Rekonfiguriere WebSocket mit neuem Token
+    func reconfigureWithNewToken() {
+        print("🔄 WebSocketManager: Rekonfiguriere mit neuem Token...")
+        disconnect()
+        setupSocket()
+        connect()
     }
     
     func startLocationTracking(userId: Int, carId: Int?) {

@@ -16,7 +16,14 @@
     "pm2:restart": "pm2 restart walkicar-backend",
     "pm2:status": "pm2 status walkicar-backend",
     "pm2:logs": "pm2 logs walkicar-backend",
-    "pm2:delete": "pm2 delete walkicar-backend"
+    "pm2:delete": "pm2 delete walkicar-backend",
+    "start:full": "npm run start:coturn && npm start",
+    "stop:full": "npm run stop:coturn && npm run stop",
+    "start:coturn": "sudo systemctl start coturn",
+    "stop:coturn": "sudo systemctl stop coturn",
+    "restart:coturn": "sudo systemctl restart coturn",
+    "status:coturn": "sudo systemctl status coturn",
+    "manage:coturn": "node coturn-manager.js"
   },
   "keywords": [
     "walkicar",

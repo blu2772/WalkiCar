@@ -13,7 +13,7 @@ import WebRTC
 class WebRTCAudioEngine: NSObject, ObservableObject {
     static let shared = WebRTCAudioEngine()
     
-    // MARK: - Published Properties
+    // MARK: - Published Properties 
     @Published var isMicrophoneEnabled = true
     @Published var isSpeakerEnabled = true
     @Published var audioLevel: Float = 0.0
@@ -151,9 +151,41 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     }
     
     func stopAudio() {
+        print("🎤 WebRTCAudioEngine: Stoppe Audio")
+        
+        // Stoppe Audio Engine
         audioEngine?.stop()
+        
+        // Deaktiviere Audio Session
+        try? audioSession?.setActive(false)
+        
+        // Stoppe alle Peer Connections
+        for userId in peerConnections.keys {
+            removePeerConnection(for: userId)
+        }
+        
         isConnected = false
+        connectionError = nil
         print("🔇 WebRTCAudioEngine: Audio gestoppt")
+    }
+    
+    // Reset alle Peer Connections für Reconnect
+    func resetAllPeerConnections() {
+        print("🔄 WebRTCAudioEngine: Reset alle Peer Connections für Reconnect")
+        
+        // Entferne alle Peer Connections
+        for userId in peerConnections.keys {
+            removePeerConnection(for: userId)
+        }
+        
+        // Lösche alle Pending ICE Candidates
+        pendingIceCandidates.removeAll()
+        
+        // Reset Connection State
+        isConnected = false
+        connectionError = nil
+        
+        print("✅ WebRTCAudioEngine: Alle Peer Connections zurückgesetzt")
     }
     
     func debugAudioStatus() {
@@ -233,24 +265,35 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
     // MARK: - WebRTC Peer Connection Management
     
     func createPeerConnection(for userId: Int, groupId: Int) -> RTCPeerConnection? {
-        guard let factory = peerConnectionFactory else { return nil }
+        print("🌐 WebRTCAudioEngine: Erstelle Peer Connection für User \(userId), Gruppe \(groupId)")
+        
+        guard let factory = peerConnectionFactory else { 
+            print("❌ WebRTCAudioEngine: Peer Connection Factory ist nil")
+            return nil 
+        }
+        
+        print("✅ WebRTCAudioEngine: Peer Connection Factory verfügbar")
         
         let configuration = RTCConfiguration()
         
-        // ICE Servers mit TURN Server
+        // ICE Servers mit TURN Server - Erweiterte Konfiguration für bessere Session-Verwaltung
         configuration.iceServers = [
+            // STUN Server für NAT-Traversal
             RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
             RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"]),
-            // TURN Server für Internet-Verbindungen
+            RTCIceServer(urlStrings: ["stun:stun2.l.google.com:19302"]),
+            
+            // TURN Server für Internet-Verbindungen mit eindeutigen Credentials
             RTCIceServer(
                 urlStrings: ["turn:walkcar.timrmp.de:3478"],
-                username: "walkcar",
+                username: "walkcar_\(userId)_\(Date().timeIntervalSince1970)",
                 credential: "walkcar123"
             ),
-            // TURN Server mit TLS
+            
+            // TURN Server mit TLS für sichere Verbindungen
             RTCIceServer(
                 urlStrings: ["turns:walkcar.timrmp.de:5349"],
-                username: "walkcar",
+                username: "walkcar_\(userId)_\(Date().timeIntervalSince1970)",
                 credential: "walkcar123"
             )
         ]
@@ -259,6 +302,12 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         configuration.rtcpMuxPolicy = .require
         configuration.tcpCandidatePolicy = .enabled
         configuration.candidateNetworkPolicy = .all
+        
+        // Erweiterte Konfiguration für bessere Session-Verwaltung
+        configuration.iceCandidatePoolSize = 10
+        configuration.continualGatheringPolicy = .gatherContinually
+        configuration.iceConnectionReceivingTimeout = 30
+        configuration.iceBackupCandidatePairPingInterval = 15
         
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: [
@@ -271,6 +320,13 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         )
         
         let peerConnection = factory.peerConnection(with: configuration, constraints: constraints, delegate: self)
+        
+        guard let peerConnection = peerConnection else {
+            print("❌ WebRTCAudioEngine: Peer Connection konnte nicht erstellt werden")
+            return nil
+        }
+        
+        print("✅ WebRTCAudioEngine: Peer Connection erfolgreich erstellt")
         
         // Audio Source mit Constraints für Audio-Aufnahme erstellen
         let audioConstraints = RTCMediaConstraints(
@@ -292,27 +348,48 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         let audioTrack = factory.audioTrack(with: audioSource, trackId: "audio_\(userId)")
         
         print("🎤 WebRTCAudioEngine: Audio Source erstellt mit Echo Cancellation und Noise Suppression")
+        print("🎤 WebRTCAudioEngine: Audio Track erstellt mit ID: audio_\(userId)")
         
         // Audio Track speichern und initialisieren
         audioTrack.isEnabled = isMicrophoneEnabled
         audioTracks[userId] = audioTrack
         
         // Mit Unified Plan: Audio Track direkt zur Peer Connection hinzufügen
-        peerConnection?.add(audioTrack, streamIds: ["stream_\(groupId)"])
+        peerConnection.add(audioTrack, streamIds: ["stream_\(groupId)"])
         
         print("🌐 WebRTCAudioEngine: Peer Connection erstellt für User \(userId) mit Audio Source")
+        print("🌐 WebRTCAudioEngine: Audio Track zur Peer Connection hinzugefügt")
         
         peerConnections[userId] = peerConnection
         return peerConnection
     }
     
     func removePeerConnection(for userId: Int) {
-        peerConnections[userId]?.close()
+        print("🌐 WebRTCAudioEngine: Entferne Peer Connection für User \(userId)")
+        
+        // Schließe Peer Connection ordnungsgemäß
+        if let peerConnection = peerConnections[userId] {
+            print("🌐 WebRTCAudioEngine: Peer Connection State vor Schließen: \(peerConnection.signalingState)")
+            print("🌐 WebRTCAudioEngine: ICE Connection State vor Schließen: \(peerConnection.iceConnectionState)")
+            
+            // Deaktiviere Audio Track vor dem Schließen
+            if let audioTrack = audioTracks[userId] {
+                audioTrack.isEnabled = false
+                print("🌐 WebRTCAudioEngine: Audio Track deaktiviert")
+            }
+            
+            // Schließe Peer Connection
+            peerConnection.close()
+            print("🌐 WebRTCAudioEngine: Peer Connection geschlossen")
+        }
+        
+        // Lösche alle Referenzen
         peerConnections.removeValue(forKey: userId)
         audioTracks.removeValue(forKey: userId)
         remoteAudioTracks.removeValue(forKey: userId)
         pendingIceCandidates.removeValue(forKey: userId)
-        print("🌐 WebRTCAudioEngine: Peer Connection entfernt für User \(userId)")
+        
+        print("🌐 WebRTCAudioEngine: Peer Connection vollständig entfernt für User \(userId)")
     }
     
     func createOffer(for userId: Int, groupId: Int, completion: @escaping (RTCSessionDescription?) -> Void) {
@@ -362,6 +439,17 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         peerConnection.setRemoteDescription(offer) { [weak self] error in
             if let error = error {
                 print("❌ WebRTCAudioEngine: Set Remote Description Fehler: \(error)")
+                print("❌ WebRTCAudioEngine: Peer Connection State: \(peerConnection.signalingState)")
+                print("❌ WebRTCAudioEngine: ICE Connection State: \(peerConnection.iceConnectionState)")
+                
+                // If we're in the wrong state, try to recover by closing and recreating the connection
+                if peerConnection.signalingState == .haveLocalOffer {
+                    print("🔄 WebRTCAudioEngine: Versuche Recovery durch Neuerstellung der Peer Connection")
+                    self?.removePeerConnection(for: userId)
+                    completion(nil)
+                    return
+                }
+                
                 completion(nil)
                 return
             }
@@ -409,12 +497,21 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             return
         }
         
+        // Prüfe ob Candidate nicht zu alt ist (verhindert alte Candidates bei Reconnects)
+        let candidateAge = Date().timeIntervalSince1970 - (candidate.sdp.contains("typ host") ? 0 : 10)
+        if candidateAge > 30 {
+            print("⚠️ WebRTCAudioEngine: ICE Candidate zu alt (\(candidateAge)s), ignoriere")
+            return
+        }
+        
         // Check if remote description is set
         if peerConnection.remoteDescription != nil {
             // Remote description is set, add ICE candidate immediately
             peerConnection.add(candidate) { error in
                 if let error = error {
                     print("❌ WebRTCAudioEngine: ICE Candidate Fehler: \(error)")
+                    print("❌ WebRTCAudioEngine: Peer Connection State: \(peerConnection.signalingState)")
+                    print("❌ WebRTCAudioEngine: ICE Connection State: \(peerConnection.iceConnectionState)")
                 } else {
                     print("🌐 WebRTCAudioEngine: ICE Candidate hinzugefügt für User \(userId)")
                 }
@@ -441,6 +538,8 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             peerConnection.add(candidate) { error in
                 if let error = error {
                     print("❌ WebRTCAudioEngine: ICE Candidate Fehler: \(error)")
+                    print("❌ WebRTCAudioEngine: Peer Connection State: \(peerConnection.signalingState)")
+                    print("❌ WebRTCAudioEngine: ICE Connection State: \(peerConnection.iceConnectionState)")
                 } else {
                     print("🌐 WebRTCAudioEngine: ICE Candidate hinzugefügt für User \(userId)")
                 }
@@ -558,13 +657,62 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
 extension WebRTCAudioEngine: RTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {
         print("🌐 WebRTCAudioEngine: Signaling State geändert: \(stateChanged)")
+        
+        // Find the user ID for this peer connection
+        Task { @MainActor in
+            if let userId = self.peerConnections.first(where: { $0.value == peerConnection })?.key {
+                switch stateChanged {
+                case .stable:
+                    print("✅ WebRTCAudioEngine: Signaling State STABLE für User \(userId)")
+                case .haveLocalOffer:
+                    print("📤 WebRTCAudioEngine: Signaling State HAVE_LOCAL_OFFER für User \(userId)")
+                case .haveLocalPrAnswer:
+                    print("📤 WebRTCAudioEngine: Signaling State HAVE_LOCAL_PRANSWER für User \(userId)")
+                case .haveRemoteOffer:
+                    print("📥 WebRTCAudioEngine: Signaling State HAVE_REMOTE_OFFER für User \(userId)")
+                case .haveRemotePrAnswer:
+                    print("📥 WebRTCAudioEngine: Signaling State HAVE_REMOTE_PRANSWER für User \(userId)")
+                case .closed:
+                    print("❌ WebRTCAudioEngine: Signaling State CLOSED für User \(userId)")
+                @unknown default:
+                    print("❓ WebRTCAudioEngine: Signaling State UNKNOWN für User \(userId)")
+                }
+            }
+        }
     }
     
     nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCIceConnectionState) {
         print("🌐 WebRTCAudioEngine: ICE Connection State geändert: \(stateChanged)")
         
         Task { @MainActor in
-            self.isConnected = (stateChanged == .connected || stateChanged == .completed)
+            if let userId = self.peerConnections.first(where: { $0.value == peerConnection })?.key {
+                switch stateChanged {
+                case .new:
+                    print("🆕 WebRTCAudioEngine: ICE Connection NEW für User \(userId)")
+                case .checking:
+                    print("🔍 WebRTCAudioEngine: ICE Connection CHECKING für User \(userId)")
+                case .connected:
+                    print("✅ WebRTCAudioEngine: ICE Connection CONNECTED für User \(userId)")
+                    self.isConnected = true
+                case .completed:
+                    print("✅ WebRTCAudioEngine: ICE Connection COMPLETED für User \(userId)")
+                    self.isConnected = true
+                case .failed:
+                    print("❌ WebRTCAudioEngine: ICE Connection FAILED für User \(userId)")
+                    self.isConnected = false
+                    self.connectionError = "ICE Connection failed for user \(userId)"
+                case .disconnected:
+                    print("⚠️ WebRTCAudioEngine: ICE Connection DISCONNECTED für User \(userId)")
+                    self.isConnected = false
+                case .closed:
+                    print("❌ WebRTCAudioEngine: ICE Connection CLOSED für User \(userId)")
+                    self.isConnected = false
+                case .count:
+                    print("📊 WebRTCAudioEngine: ICE Connection COUNT für User \(userId)")
+                @unknown default:
+                    print("❓ WebRTCAudioEngine: ICE Connection UNKNOWN für User \(userId)")
+                }
+            }
         }
     }
     
@@ -573,17 +721,23 @@ extension WebRTCAudioEngine: RTCPeerConnectionDelegate {
     }
     
     nonisolated func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-        print("🌐 WebRTCAudioEngine: ICE Candidate generiert")
+        print("🌐 WebRTCAudioEngine: ICE Candidate generiert: \(candidate.sdp)")
         
         // Find the user ID for this peer connection
         Task { @MainActor in
             if let userId = self.peerConnections.first(where: { $0.value == peerConnection })?.key {
+                // Prüfe ob Candidate bereits gesendet wurde (verhindert Duplikate)
+                let candidateKey = "\(candidate.sdp)_\(candidate.sdpMLineIndex)_\(candidate.sdpMid ?? "")"
+                
                 // Send ICE candidate via WebSocket
                 let candidateData: [String: Any] = [
                     "candidate": candidate.sdp,
                     "sdpMLineIndex": candidate.sdpMLineIndex,
-                    "sdpMid": candidate.sdpMid ?? ""
+                    "sdpMid": candidate.sdpMid ?? "",
+                    "timestamp": Date().timeIntervalSince1970
                 ]
+                
+                print("🌐 WebRTCAudioEngine: Sende ICE Candidate für User \(userId)")
                 
                 // Notify WebRTCPeerConnectionManager to send the candidate
                 NotificationCenter.default.post(

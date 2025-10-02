@@ -1,9 +1,13 @@
 #!/bin/bash
 
-# WalkiCar Backend Start Script für Plesk
-# Dieses Skript startet den WalkiCar Backend Server
+# WalkiCar Backend Start Script für Plesk mit Coturn-Integration
+# Dieses Skript startet Coturn und dann den WalkiCar Backend Server
 
 cd /var/www/vhosts/timrmp.de/httpdocs/walkicar/backend
+
+echo "🚀 === WalkiCar Full Stack Start ==="
+echo "📅 $(date)"
+echo ""
 
 # Prüfe ob Node.js installiert ist
 if ! command -v node &> /dev/null; then
@@ -29,6 +33,38 @@ if [ ! -d node_modules ]; then
     npm install
 fi
 
-# Starte den Server
+# === COTURN MANAGEMENT ===
+echo "📡 === Coturn-Server Management ==="
+
+# Prüfe ob Coturn bereits läuft
+if systemctl is-active --quiet coturn; then
+    echo "✅ Coturn läuft bereits"
+else
+    echo "🚀 Starte Coturn-Server..."
+    sudo systemctl start coturn
+    
+    # Warte kurz und prüfe Status
+    sleep 3
+    if systemctl is-active --quiet coturn; then
+        echo "✅ Coturn erfolgreich gestartet"
+    else
+        echo "❌ Fehler beim Starten von Coturn"
+        echo "🔍 Coturn Status:"
+        sudo systemctl status coturn --no-pager -l
+        echo ""
+        echo "💡 Versuche trotzdem Backend zu starten..."
+    fi
+fi
+
+# Zeige Coturn-Status
+echo "📊 Coturn Status:"
+sudo systemctl status coturn --no-pager -l | head -10
+echo ""
+
+# === BACKEND START ===
+echo "🔧 === Backend-Server Start ==="
+
+# Starte Backend
 echo "🚀 Starte WalkiCar Backend Server..."
+echo "💡 Verwende 'npm run start:full' für automatisches Coturn + Backend Management"
 npm start

@@ -78,6 +78,22 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         localUserId = nil
     }
     
+    // Reset für Reconnect - saubere Neuerstellung aller Verbindungen
+    func resetForReconnect() {
+        print("🔄 WebRTCPeerConnectionManager: Reset für Reconnect")
+        
+        // Stoppe alle Verbindungen
+        stopVoiceChat()
+        
+        // Reset Audio Engine
+        audioEngine.resetAllPeerConnections()
+        
+        // Kurze Pause für saubere Trennung
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("✅ WebRTCPeerConnectionManager: Reset abgeschlossen")
+        }
+    }
+    
     func addParticipant(userId: Int) {
         guard let groupId = currentGroupId,
               let localUserId = localUserId else { 
@@ -97,16 +113,24 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
         if audioEngine.createPeerConnection(for: userId, groupId: groupId) != nil {
             activeConnections[userId] = .connecting
             
-            // Create offer
-            audioEngine.createOffer(for: userId, groupId: groupId) { [weak self] offer in
-                guard let offer = offer else { 
-                    print("❌ WebRTCPeerConnectionManager: Kein Offer erstellt für neuen Teilnehmer \(userId)")
-                    return 
+            // Anti-glare: Only the user with the lower ID creates the offer
+            // This prevents both peers from trying to create offers simultaneously
+            if localUserId < userId {
+                print("🎤 WebRTCPeerConnectionManager: Lokale User-ID (\(localUserId)) < Remote User-ID (\(userId)) - Erstelle Offer")
+                // Create offer
+                audioEngine.createOffer(for: userId, groupId: groupId) { [weak self] offer in
+                    guard let offer = offer else { 
+                        print("❌ WebRTCPeerConnectionManager: Kein Offer erstellt für neuen Teilnehmer \(userId)")
+                        return 
+                    }
+                    
+                    print("🎤 WebRTCPeerConnectionManager: Sende Offer an neuen Teilnehmer \(userId)")
+                    // Send offer via WebSocket
+                    self?.sendOffer(to: userId, offer: offer, groupId: groupId)
                 }
-                
-                print("🎤 WebRTCPeerConnectionManager: Sende Offer an neuen Teilnehmer \(userId)")
-                // Send offer via WebSocket
-                self?.sendOffer(to: userId, offer: offer, groupId: groupId)
+            } else {
+                print("🎤 WebRTCPeerConnectionManager: Lokale User-ID (\(localUserId)) >= Remote User-ID (\(userId)) - Warte auf Offer")
+                // Don't create offer, wait for the other peer to send one
             }
         } else {
             print("❌ WebRTCPeerConnectionManager: Peer Connection für User \(userId) konnte nicht erstellt werden")
@@ -220,6 +244,13 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
             return 
         }
         
+        // Anti-glare check: Only process offer if we didn't send one ourselves
+        // (i.e., if localUserId >= userId, we should have sent the offer, not received one)
+        if localUserId >= userId {
+            print("⚠️ WebRTCPeerConnectionManager: Anti-Glare: Ignoriere Offer von User \(userId) da lokale User-ID (\(localUserId)) >= Remote User-ID (\(userId))")
+            return
+        }
+        
         // Create peer connection if it doesn't exist
         if activeConnections[userId] == nil {
             print("🎤 WebRTCPeerConnectionManager: Erstelle Peer Connection für User \(userId)")
@@ -292,6 +323,18 @@ class WebRTCPeerConnectionManager: NSObject, ObservableObject {
     
     private func handleIncomingAnswer(from userId: Int, groupId: Int, answerData: [String: Any]) {
         print("🎤 WebRTCPeerConnectionManager: Erhalte Answer von User \(userId)")
+        
+        guard let localUserId = localUserId else { 
+            print("❌ WebRTCPeerConnectionManager: Keine lokale User-ID für Answer")
+            return 
+        }
+        
+        // Anti-glare check: Only process answer if we sent an offer
+        // (i.e., if localUserId < userId, we should have sent the offer)
+        if localUserId >= userId {
+            print("⚠️ WebRTCPeerConnectionManager: Anti-Glare: Ignoriere Answer von User \(userId) da lokale User-ID (\(localUserId)) >= Remote User-ID (\(userId))")
+            return
+        }
         
         // Create RTCSessionDescription from answer data
         guard let sdp = answerData["sdp"] as? String else { 

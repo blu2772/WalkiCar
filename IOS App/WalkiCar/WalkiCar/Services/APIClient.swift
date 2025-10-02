@@ -50,13 +50,21 @@ class APIClient: ObservableObject {
     }
     
     func logout() async throws {
-        _ = try await makeRequest(
-            endpoint: "/auth/logout",
-            method: "POST",
-            body: Optional<[String: String]>.none,
-            responseType: [String: String].self,
-            requiresAuth: true
-        )
+        // Versuche Server-Logout, aber ignoriere Fehler
+        do {
+            _ = try await makeRequest(
+                endpoint: "/auth/logout",
+                method: "POST",
+                body: Optional<[String: String]>.none,
+                responseType: [String: String].self,
+                requiresAuth: true
+            )
+            print("✅ APIClient: Server-Logout erfolgreich")
+        } catch {
+            print("⚠️ APIClient: Server-Logout fehlgeschlagen (ignoriert): \(error)")
+        }
+        
+        // Token immer löschen, auch wenn Server-Logout fehlschlägt
         clearAuthToken()
     }
     
@@ -457,19 +465,67 @@ class APIClient: ObservableObject {
     func setAuthToken(_ token: String) {
         self.authToken = token
         UserDefaults.standard.set(token, forKey: "auth_token")
+        // Speichere auch das Ablaufdatum des Tokens (30 Tage von jetzt)
+        let expiryDate = Date().addingTimeInterval(30 * 24 * 60 * 60) // 30 Tage
+        UserDefaults.standard.set(expiryDate, forKey: "auth_token_expiry")
+        print("🔐 APIClient: Token gesetzt, läuft ab am: \(expiryDate)")
+        
+        // Benachrichtige WebSocket über Token-Änderung
+        NotificationCenter.default.post(name: NSNotification.Name("AuthTokenUpdated"), object: token)
     }
     
     private func loadAuthToken() {
         self.authToken = UserDefaults.standard.string(forKey: "auth_token")
+        
+        // Prüfe ob Token abgelaufen ist
+        if let expiryDate = UserDefaults.standard.object(forKey: "auth_token_expiry") as? Date {
+            if Date() > expiryDate {
+                print("⚠️ APIClient: Token ist abgelaufen, lösche Token")
+                clearAuthToken()
+            } else {
+                print("✅ APIClient: Token ist noch gültig bis: \(expiryDate)")
+            }
+        }
     }
     
     private func clearAuthToken() {
         self.authToken = nil
         UserDefaults.standard.removeObject(forKey: "auth_token")
+        UserDefaults.standard.removeObject(forKey: "auth_token_expiry")
+        print("🔐 APIClient: Token gelöscht")
     }
     
     var isAuthenticated: Bool {
         return authToken != nil
+    }
+    
+    // Prüfe ob Token bald abläuft (innerhalb der nächsten 7 Tage)
+    func isTokenExpiringSoon() -> Bool {
+        guard let expiryDate = UserDefaults.standard.object(forKey: "auth_token_expiry") as? Date else {
+            return false
+        }
+        let sevenDaysFromNow = Date().addingTimeInterval(7 * 24 * 60 * 60)
+        return expiryDate < sevenDaysFromNow
+    }
+    
+    // Automatische Token-Erneuerung
+    func refreshTokenIfNeeded() async throws {
+        guard isAuthenticated else {
+            print("⚠️ APIClient: Kein Token vorhanden, keine Erneuerung möglich")
+            return
+        }
+        
+        if isTokenExpiringSoon() {
+            print("🔄 APIClient: Token läuft bald ab, erneuere Token...")
+            do {
+                let response = try await refreshToken()
+                setAuthToken(response.token)
+                print("✅ APIClient: Token erfolgreich erneuert")
+            } catch {
+                print("❌ APIClient: Token-Erneuerung fehlgeschlagen: \(error)")
+                throw error
+            }
+        }
     }
     
     // MARK: - Generic Request Method
@@ -523,9 +579,44 @@ class APIClient: ObservableObject {
         print("📊 HTTP-Status: \(httpResponse.statusCode)")
         
         if httpResponse.statusCode == 401 {
-            print("🔒 Unauthorized - Token wird gelöscht")
-            clearAuthToken()
-            throw APIError.unauthorized
+            print("🔒 Unauthorized - Versuche Token-Erneuerung...")
+            
+            // Versuche Token zu erneuern
+            do {
+                let response = try await refreshToken()
+                setAuthToken(response.token)
+                print("✅ APIClient: Token erfolgreich erneuert, wiederhole Request")
+                
+                // Wiederhole den ursprünglichen Request mit dem neuen Token
+                var retryRequest = URLRequest(url: url)
+                retryRequest.httpMethod = method
+                retryRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                retryRequest.setValue("Bearer \(response.token)", forHTTPHeaderField: "Authorization")
+                
+                if let body = body {
+                    retryRequest.httpBody = try JSONEncoder().encode(body)
+                }
+                
+                let (retryData, retryResponse) = try await session.data(for: retryRequest)
+                
+                guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                if retryHttpResponse.statusCode >= 200 && retryHttpResponse.statusCode < 300 {
+                    print("✅ APIClient: Request nach Token-Erneuerung erfolgreich")
+                    return try JSONDecoder().decode(responseType, from: retryData)
+                } else {
+                    print("❌ APIClient: Request nach Token-Erneuerung fehlgeschlagen: \(retryHttpResponse.statusCode)")
+                    clearAuthToken()
+                    throw APIError.unauthorized
+                }
+                
+            } catch {
+                print("❌ APIClient: Token-Erneuerung fehlgeschlagen: \(error)")
+                clearAuthToken()
+                throw APIError.unauthorized
+            }
         }
         
         guard httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 else {
