@@ -323,31 +323,31 @@ let iceServers = [
 
 // CLI-Interface
 async function main() {
-  const debugger = new CoturnDebugger();
+  const debugTool = new CoturnDebugger();
   const command = process.argv[2] || 'full';
 
   try {
     switch (command) {
       case 'full':
-        await debugger.runFullDiagnosis();
+        await debugTool.runFullDiagnosis();
         break;
       case 'service':
-        await debugger.checkCoturnService();
+        await debugTool.checkCoturnService();
         break;
       case 'processes':
-        await debugger.checkCoturnProcesses();
+        await debugTool.checkCoturnProcesses();
         break;
       case 'ports':
-        await debugger.checkCoturnPorts();
+        await debugTool.checkCoturnPorts();
         break;
       case 'config':
-        await debugger.checkCoturnConfig();
+        await debugTool.checkCoturnConfig();
         break;
       case 'connection':
-        await debugger.testCoturnConnection();
+        await debugTool.testCoturnConnection();
         break;
       case 'ios-config':
-        debugger.showRecommendedConfig();
+        debugTool.showRecommendedConfig();
         break;
       case 'help':
       default:
