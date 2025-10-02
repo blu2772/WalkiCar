@@ -29,7 +29,12 @@
     "server:coturn": "node server-coturn-manager.js",
     "coturn:status": "node server-coturn-manager.js status",
     "coturn:info": "node server-coturn-manager.js info",
-    "coturn:sudoers": "node server-coturn-manager.js sudoers"
+    "coturn:sudoers": "node server-coturn-manager.js sudoers",
+    "debug:coturn": "node coturn-debug.js full",
+    "debug:coturn:service": "node coturn-debug.js service",
+    "debug:coturn:ports": "node coturn-debug.js ports",
+    "debug:coturn:config": "node coturn-debug.js config",
+    "debug:ios": "node coturn-debug.js ios-config"
   },
   "keywords": [
     "walkicar",

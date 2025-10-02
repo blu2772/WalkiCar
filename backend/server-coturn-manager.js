@@ -190,19 +190,46 @@ class ServerCoturnManager {
         console.log('⚠️ Konnte Prozess-Info nicht abrufen:', error.message);
       }
 
-      // Port-Status
+      // Port-Status (alternative zu netstat)
       try {
-        const portResult = await this.executeCommand('netstat', ['-tulpn']);
-        const turnPorts = portResult.stdout.split('\n').filter(line => 
-          line.includes(':3478') || line.includes(':5349') || line.includes(':49152')
-        );
-        
-        if (turnPorts.length > 0) {
-          console.log('🔌 TURN-Server Ports:');
-          turnPorts.forEach(port => console.log('  ', port));
+        // Versuche verschiedene Tools für Port-Analyse
+        const portCommands = [
+          () => this.executeCommand('ss', ['-tulpn']),
+          () => this.executeCommand('lsof', ['-i', ':3478']),
+          () => this.executeCommand('lsof', ['-i', ':5349']),
+          () => this.executeCommand('netstat', ['-tulpn'])
+        ];
+
+        let portsFound = false;
+        for (const cmd of portCommands) {
+          try {
+            const result = await cmd();
+            const lines = result.stdout.split('\n');
+            const turnPorts = lines.filter(line => 
+              line.includes(':3478') || 
+              line.includes(':5349') || 
+              line.includes(':49152') ||
+              line.includes('turnserver') ||
+              line.includes('TURN')
+            );
+            
+            if (turnPorts.length > 0) {
+              console.log('🔌 TURN-Server Ports:');
+              turnPorts.forEach(port => console.log('  ', port));
+              portsFound = true;
+              break;
+            }
+          } catch (error) {
+            continue; // Versuche nächsten Befehl
+          }
+        }
+
+        if (!portsFound) {
+          console.log('⚠️ Konnte keine TURN-Ports ermitteln');
+          console.log('💡 Installiere netstat oder ss für Port-Analyse');
         }
       } catch (error) {
-        console.log('⚠️ Konnte Port-Info nicht abrufen:', error.message);
+        console.log('⚠️ Port-Analyse komplett fehlgeschlagen:', error.message);
       }
 
       return true;
