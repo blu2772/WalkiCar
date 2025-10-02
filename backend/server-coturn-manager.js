@@ -88,6 +88,46 @@ class ServerCoturnManager {
   }
 
   /**
+   * Stoppt Coturn
+   */
+  async stopCoturn() {
+    try {
+      console.log('🛑 Stoppe Coturn-Server...');
+      
+      // Versuche verschiedene Methoden
+      const methods = [
+        () => this.executeCommand('systemctl', ['stop', 'coturn']),
+        () => this.executeCommand('service', ['coturn', 'stop']),
+        () => this.executeCommand('sudo', ['systemctl', 'stop', 'coturn']),
+        () => this.executeCommand('pkill', ['turnserver'])
+      ];
+
+      for (const method of methods) {
+        try {
+          const result = await method();
+          this.isRunning = false;
+          console.log('✅ Coturn erfolgreich gestoppt');
+          
+          if (result.stdout) {
+            console.log('📄 Output:', result.stdout.trim());
+          }
+          
+          return true;
+        } catch (error) {
+          console.log(`⚠️ Stopp-Methode fehlgeschlagen: ${error.message}`);
+          continue;
+        }
+      }
+      
+      throw new Error('Alle Stopp-Methoden fehlgeschlagen');
+      
+    } catch (error) {
+      console.error('❌ Fehler beim Stoppen von Coturn:', error.message);
+      return false;
+    }
+  }
+
+  /**
    * Prüft Coturn-Status
    */
   async checkStatus() {
@@ -229,6 +269,11 @@ async function main() {
     switch (command) {
       case 'start':
         await manager.startCoturn();
+        process.exit(0);
+        break;
+        
+      case 'stop':
+        await manager.stopCoturn();
         process.exit(0);
         break;
         
