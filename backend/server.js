@@ -130,29 +130,36 @@ app.use('/api/locations', authenticateToken, locationRoutes);
 // TURN Credentials Route
 app.get('/api/turn-credentials', authenticateToken, (req, res) => {
   try {
-    // TURN Server Konfiguration
+    // TURN Server Konfiguration - Statische Credentials für Coturn
     const TURN_SERVER = 'walkcar.timrmp.de';
     const TURN_PORT = 3478;
     const TURN_TLS_PORT = 5349;
-    const TURN_SECRET = 'walkcar123'; // Sollte in .env stehen
-    
-    // Dynamische Credentials generieren (24h gültig)
-    const username = Math.floor(Date.now() / 1000) + ':walkcar';
-    const credential = crypto.createHmac('sha1', TURN_SECRET).update(username).digest('base64');
+    const TURN_USERNAME = 'walkcar';
+    const TURN_PASSWORD = 'walkcar123';
     
     const iceServers = [
+      // Google STUN Server als Fallback
+      {
+        urls: ['stun:stun.l.google.com:19302']
+      },
+      {
+        urls: ['stun:stun1.l.google.com:19302']
+      },
+      // Lokaler STUN Server
       {
         urls: [`stun:${TURN_SERVER}:${TURN_PORT}`]
       },
+      // TURN Server UDP/TCP
       {
         urls: [`turn:${TURN_SERVER}:${TURN_PORT}`],
-        username: username,
-        credential: credential
+        username: TURN_USERNAME,
+        credential: TURN_PASSWORD
       },
+      // TURN Server TLS
       {
         urls: [`turns:${TURN_SERVER}:${TURN_TLS_PORT}`],
-        username: username,
-        credential: credential
+        username: TURN_USERNAME,
+        credential: TURN_PASSWORD
       }
     ];
     

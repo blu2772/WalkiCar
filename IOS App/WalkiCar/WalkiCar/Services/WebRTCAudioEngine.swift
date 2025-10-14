@@ -276,24 +276,27 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         let configuration = RTCConfiguration()
         
-        // ICE Servers mit TURN Server - Erweiterte Konfiguration für bessere Session-Verwaltung
+        // ICE Servers mit TURN Server - Korrekte Konfiguration für Coturn-Server
         configuration.iceServers = [
             // STUN Server für NAT-Traversal
             RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
             RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"]),
             RTCIceServer(urlStrings: ["stun:stun2.l.google.com:19302"]),
             
-            // TURN Server für Internet-Verbindungen mit eindeutigen Credentials
+            // Lokaler STUN Server
+            RTCIceServer(urlStrings: ["stun:walkcar.timrmp.de:3478"]),
+            
+            // TURN Server für Internet-Verbindungen (UDP/TCP)
             RTCIceServer(
                 urlStrings: ["turn:walkcar.timrmp.de:3478"],
-                username: "walkcar_\(userId)_\(Date().timeIntervalSince1970)",
+                username: "walkcar",
                 credential: "walkcar123"
             ),
             
             // TURN Server mit TLS für sichere Verbindungen
             RTCIceServer(
                 urlStrings: ["turns:walkcar.timrmp.de:5349"],
-                username: "walkcar_\(userId)_\(Date().timeIntervalSince1970)",
+                username: "walkcar",
                 credential: "walkcar123"
             )
         ]
