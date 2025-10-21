@@ -221,8 +221,26 @@ app.get('/api/debug/socket', (req, res) => {
   });
 });
 
-// Socket.IO connection handling
-io.use(async (socket, next) => {
+  // Debug: Alle Socket.IO Events loggen
+  io.on('connection', (socket) => {
+    console.log('🔌 Socket.IO: Neue Verbindung', { socketId: socket.id, userId: socket.userId });
+    
+    // Alle Events loggen für Debugging
+    const originalEmit = socket.emit;
+    socket.emit = function(event, ...args) {
+      console.log('📤 Socket.IO: Event gesendet', { event, socketId: socket.id, argsLength: args.length });
+      return originalEmit.apply(this, arguments);
+    };
+    
+    const originalOn = socket.on;
+    socket.on = function(event, handler) {
+      console.log('📥 Socket.IO: Event-Handler registriert', { event, socketId: socket.id });
+      return originalOn.apply(this, arguments);
+    };
+  });
+
+  // Socket.IO connection handling
+  io.use(async (socket, next) => {
   try {
     console.log('🔐 Socket.IO Auth: Handshake-Daten:', {
       auth: socket.handshake.auth,
