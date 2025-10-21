@@ -317,7 +317,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         guard let peerConnection = peerConnection else {
             print("❌ WebRTCAudioEngine: Peer Connection konnte nicht erstellt werden")
             print("❌ WebRTCAudioEngine: Debug - ICE Servers: \(configuration.iceServers.count)")
-            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.constraints)")
+            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.mandatoryConstraints)")
             return nil
         }
         
