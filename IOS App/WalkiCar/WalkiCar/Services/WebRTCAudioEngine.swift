@@ -304,12 +304,12 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         configuration.iceBackupCandidatePairPingInterval = 15
         
         let constraints = RTCMediaConstraints(
-            constraints: [
+            mandatoryConstraints: [
                 "OfferToReceiveAudio": "true",
                 "OfferToReceiveVideo": "false",
                 "DtlsSrtpKeyAgreement": "true"
             ],
-            optionalConstraints: []
+            optionalConstraints: [:]
         )
         
         let peerConnection = factory.peerConnection(with: configuration, constraints: constraints, delegate: self)
@@ -325,7 +325,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         // Audio Source mit Constraints für Audio-Aufnahme erstellen
         let audioConstraints = RTCMediaConstraints(
-            constraints: [
+            mandatoryConstraints: [
                 "googEchoCancellation": "true",
                 "googAutoGainControl": "true",
                 "googNoiseSuppression": "true",
@@ -335,7 +335,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
                 "googAudioNetworkAdaptor": "true",
                 "googAudioNetworkAdaptorConfig": "{\"minBitrateBps\":32000,\"maxBitrateBps\":128000}"
             ],
-            optionalConstraints: []
+            optionalConstraints: [:]
         )
         
         let audioSource = factory.audioSource(with: audioConstraints)
@@ -393,11 +393,11 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         }
         
         let constraints = RTCMediaConstraints(
-            constraints: [
+            mandatoryConstraints: [
                 "OfferToReceiveAudio": "true",
                 "OfferToReceiveVideo": "false"
             ],
-            optionalConstraints: []
+            optionalConstraints: [:]
         )
         
         peerConnection.offer(for: constraints) { [weak self] sdp, error in
@@ -449,11 +449,11 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             }
             
             let constraints = RTCMediaConstraints(
-                constraints: [
+                mandatoryConstraints: [
                     "OfferToReceiveAudio": "true",
                     "OfferToReceiveVideo": "false"
                 ],
-                optionalConstraints: []
+                optionalConstraints: [:]
             )
             
             self?.peerConnections[userId]?.answer(for: constraints) { sdp, error in
