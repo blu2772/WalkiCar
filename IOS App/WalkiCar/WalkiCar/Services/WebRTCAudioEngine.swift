@@ -304,13 +304,12 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         configuration.iceBackupCandidatePairPingInterval = 15
         
         let constraints = RTCMediaConstraints(
-            mandatoryConstraints: [
+            constraints: [
                 "OfferToReceiveAudio": "true",
-                "OfferToReceiveVideo": "false"
-            ],
-            optionalConstraints: [
+                "OfferToReceiveVideo": "false",
                 "DtlsSrtpKeyAgreement": "true"
-            ]
+            ],
+            optionalConstraints: []
         )
         
         let peerConnection = factory.peerConnection(with: configuration, constraints: constraints, delegate: self)
@@ -318,7 +317,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         guard let peerConnection = peerConnection else {
             print("❌ WebRTCAudioEngine: Peer Connection konnte nicht erstellt werden")
             print("❌ WebRTCAudioEngine: Debug - ICE Servers: \(configuration.iceServers.count)")
-            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.mandatoryConstraints)")
+            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.constraints)")
             return nil
         }
         
@@ -326,18 +325,17 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         // Audio Source mit Constraints für Audio-Aufnahme erstellen
         let audioConstraints = RTCMediaConstraints(
-            mandatoryConstraints: [
+            constraints: [
                 "googEchoCancellation": "true",
                 "googAutoGainControl": "true",
                 "googNoiseSuppression": "true",
                 "googHighpassFilter": "true",
                 "googTypingNoiseDetection": "true",
-                "googAudioMirroring": "false"
-            ],
-            optionalConstraints: [
+                "googAudioMirroring": "false",
                 "googAudioNetworkAdaptor": "true",
                 "googAudioNetworkAdaptorConfig": "{\"minBitrateBps\":32000,\"maxBitrateBps\":128000}"
-            ]
+            ],
+            optionalConstraints: []
         )
         
         let audioSource = factory.audioSource(with: audioConstraints)
@@ -395,11 +393,11 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         }
         
         let constraints = RTCMediaConstraints(
-            mandatoryConstraints: [
+            constraints: [
                 "OfferToReceiveAudio": "true",
                 "OfferToReceiveVideo": "false"
             ],
-            optionalConstraints: nil
+            optionalConstraints: []
         )
         
         peerConnection.offer(for: constraints) { [weak self] sdp, error in
@@ -451,11 +449,11 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             }
             
             let constraints = RTCMediaConstraints(
-                mandatoryConstraints: [
+                constraints: [
                     "OfferToReceiveAudio": "true",
                     "OfferToReceiveVideo": "false"
                 ],
-                optionalConstraints: nil
+                optionalConstraints: []
             )
             
             self?.peerConnections[userId]?.answer(for: constraints) { sdp, error in
