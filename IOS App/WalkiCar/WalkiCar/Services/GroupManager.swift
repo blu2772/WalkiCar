@@ -55,7 +55,8 @@ class GroupManager: ObservableObject {
         
         Task {
             do {
-                let groups = try await apiClient.getGroups()
+                let response = try await apiClient.getGroupsList()
+                let groups = response.groups
                 
                 await MainActor.run {
                     self.groups = groups
@@ -73,7 +74,8 @@ class GroupManager: ObservableObject {
     func createGroup(name: String, description: String) {
         Task {
             do {
-                let response = try await apiClient.createGroup(name: name, description: description)
+                let request = CreateGroupRequest(name: name, description: description)
+                let response = try await apiClient.createGroup(request)
                 
                 await MainActor.run {
                     if response.success {
@@ -91,23 +93,9 @@ class GroupManager: ObservableObject {
     }
     
     func joinGroup(groupId: Int) {
-        Task {
-            do {
-                let response = try await apiClient.joinGroup(groupId: groupId)
-                
-                await MainActor.run {
-                    if response.success {
-                        self.loadGroups() // Gruppen neu laden
-                    } else {
-                        self.errorMessage = response.message
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
-                }
-            }
-        }
+        // TODO: Implementiere joinGroup API-Methode im Backend
+        print("⚠️ GroupManager: joinGroup noch nicht implementiert")
+        errorMessage = "Gruppe beitreten noch nicht verfügbar"
     }
     
     func leaveGroup(groupId: Int) {
@@ -310,11 +298,15 @@ class GroupManager: ObservableObject {
                             name: currentGroup.name,
                             description: currentGroup.description,
                             creatorId: currentGroup.creatorId,
-                            createdAt: currentGroup.createdAt,
-                            memberCount: currentGroup.memberCount,
+                            isPublic: currentGroup.isPublic,
+                            maxMembers: currentGroup.maxMembers,
                             isActive: currentGroup.isActive,
+                            createdAt: currentGroup.createdAt,
+                            updatedAt: currentGroup.updatedAt,
+                            memberCount: currentGroup.memberCount,
                             voiceChatActive: status.isActive,
-                            voiceChatParticipants: status.participants
+                            voiceChatStartedAt: currentGroup.voiceChatStartedAt,
+                            members: currentGroup.members
                         )
                     }
                 }
@@ -334,11 +326,15 @@ class GroupManager: ObservableObject {
                 name: currentGroup.name,
                 description: currentGroup.description,
                 creatorId: currentGroup.creatorId,
-                createdAt: currentGroup.createdAt,
-                memberCount: currentGroup.memberCount,
+                isPublic: currentGroup.isPublic,
+                maxMembers: currentGroup.maxMembers,
                 isActive: currentGroup.isActive,
+                createdAt: currentGroup.createdAt,
+                updatedAt: currentGroup.updatedAt,
+                memberCount: currentGroup.memberCount,
                 voiceChatActive: isActive,
-                voiceChatParticipants: currentGroup.voiceChatParticipants
+                voiceChatStartedAt: currentGroup.voiceChatStartedAt,
+                members: currentGroup.members
             )
         }
     }
