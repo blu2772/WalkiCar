@@ -141,8 +141,11 @@ router.get('/test-db', async (req, res) => {
 // E-Mail/Passwort Registrierung
 router.post('/register-email', async (req, res) => {
   try {
+    console.log('📧 E-Mail Registrierung gestartet:', req.body);
+    
     const { error, value } = emailRegisterSchema.validate(req.body);
     if (error) {
+      console.log('❌ Validierungsfehler:', error.details[0].message);
       return res.status(400).json({ 
         error: 'Ungültige Eingabedaten', 
         details: error.details[0].message 
@@ -150,12 +153,15 @@ router.post('/register-email', async (req, res) => {
     }
 
     const { email, username, display_name, password } = value;
+    console.log('📧 Registrierung - Daten validiert:', { email, username, display_name });
 
     // Überprüfe ob Benutzer bereits existiert
+    console.log('🔍 Prüfe ob Benutzer bereits existiert...');
     const existingUser = await query(
       'SELECT id FROM users WHERE email = ? OR username = ?',
       [email, username]
     );
+    console.log('🔍 Existierende Benutzer gefunden:', existingUser.length);
 
     if (existingUser.length > 0) {
       return res.status(409).json({ error: 'Benutzer existiert bereits' });
@@ -223,7 +229,8 @@ router.post('/register-email', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('E-Mail-Registrierungsfehler:', error);
+    console.error('❌ E-Mail-Registrierungsfehler:', error);
+    console.error('❌ Fehler-Stack:', error.stack);
     res.status(500).json({ 
       error: 'Registrierung fehlgeschlagen', 
       details: error.message,
@@ -303,8 +310,11 @@ router.post('/login', async (req, res) => {
 // E-Mail/Passwort Login
 router.post('/login-email', async (req, res) => {
   try {
+    console.log('🔐 E-Mail Login gestartet:', req.body);
+    
     const { error, value } = emailLoginSchema.validate(req.body);
     if (error) {
+      console.log('❌ Login Validierungsfehler:', error.details[0].message);
       return res.status(400).json({ 
         error: 'Ungültige Eingabedaten', 
         details: error.details[0].message 
@@ -312,12 +322,15 @@ router.post('/login-email', async (req, res) => {
     }
 
     const { email, password } = value;
+    console.log('🔐 Login - Daten validiert:', { email });
 
     // Finde Benutzer
+    console.log('🔍 Suche Benutzer in Datenbank...');
     const user = await query(
       'SELECT id, username, display_name, email, password_hash, is_active, email_verified FROM users WHERE email = ? AND is_active = TRUE AND auth_provider = "email"',
       [email]
     );
+    console.log('🔍 Benutzer gefunden:', user.length > 0 ? 'Ja' : 'Nein');
 
     if (user.length === 0) {
       return res.status(401).json({ error: 'Ungültige Anmeldedaten' });
@@ -369,8 +382,13 @@ router.post('/login-email', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('E-Mail-Anmeldefehler:', error);
-    res.status(500).json({ error: 'Anmeldung fehlgeschlagen' });
+    console.error('❌ E-Mail-Anmeldefehler:', error);
+    console.error('❌ Fehler-Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Anmeldung fehlgeschlagen',
+      details: error.message,
+      type: error.code || 'UNKNOWN_ERROR'
+    });
   }
 });
 

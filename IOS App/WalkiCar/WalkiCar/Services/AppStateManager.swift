@@ -18,6 +18,8 @@ class AppStateManager: ObservableObject {
     
     private var trackingCheckCount = 0
     private let maxTrackingChecks = 3
+    private var garageLoadAttempts = 0
+    private let maxGarageLoadAttempts = 5
     
     private init() {
         setupAppLifecycle()
@@ -80,13 +82,24 @@ class AppStateManager: ObservableObject {
         
         // Prüfe ob Garage bereits geladen ist
         guard !garageManager.cars.isEmpty else {
-            print("🏠 AppStateManager: Garage noch nicht geladen - warte... (Garage hat \(garageManager.cars.count) Autos)")
-            // Warte kurz und versuche es erneut (nur einmal)
+            garageLoadAttempts += 1
+            print("🏠 AppStateManager: Garage noch nicht geladen - warte... (Garage hat \(garageManager.cars.count) Autos) - Versuch \(garageLoadAttempts)/\(maxGarageLoadAttempts)")
+            
+            // Stoppe nach maximalen Versuchen
+            guard garageLoadAttempts < maxGarageLoadAttempts else {
+                print("🏠 AppStateManager: Maximale Anzahl von Garage-Lade-Versuchen erreicht - stoppe")
+                return
+            }
+            
+            // Warte kurz und versuche es erneut
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.checkAndStartAutomaticTracking()
             }
             return
         }
+        
+        // Reset Garage-Lade-Versuche wenn erfolgreich
+        garageLoadAttempts = 0
         
         // Prüfe ob ein Auto aktiv ist
         guard let activeCar = garageManager.activeCar else {
@@ -145,13 +158,24 @@ class AppStateManager: ObservableObject {
         
         // Prüfe ob Garage bereits geladen ist
         guard !garageManager.cars.isEmpty else {
-            print("🏠 AppStateManager: Garage noch nicht geladen für Audio-Route-Änderung - warte... (Garage hat \(garageManager.cars.count) Autos)")
+            garageLoadAttempts += 1
+            print("🏠 AppStateManager: Garage noch nicht geladen für Audio-Route-Änderung - warte... (Garage hat \(garageManager.cars.count) Autos) - Versuch \(garageLoadAttempts)/\(maxGarageLoadAttempts)")
+            
+            // Stoppe nach maximalen Versuchen
+            guard garageLoadAttempts < maxGarageLoadAttempts else {
+                print("🏠 AppStateManager: Maximale Anzahl von Garage-Lade-Versuchen erreicht - stoppe Audio-Route-Check")
+                return
+            }
+            
             // Warte kurz und versuche es erneut
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 self.onAudioRouteChanged(connectedDevices: connectedDevices)
             }
             return
         }
+        
+        // Reset Garage-Lade-Versuche wenn erfolgreich
+        garageLoadAttempts = 0
         
         print("🏠 AppStateManager: Audio-Route geändert - \(connectedDevices.count) Geräte verbunden")
         for device in connectedDevices {
