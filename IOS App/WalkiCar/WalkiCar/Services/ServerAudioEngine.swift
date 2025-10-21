@@ -215,7 +215,7 @@ class ServerAudioEngine: NSObject, ObservableObject {
             "channels": 1
         ]
         
-        webSocketManager?.emit("audio-chunk", data: audioData)
+        webSocketManager?.sendAudioChunk(groupId: groupId, audioData: chunk)
         
         print("📡 ServerAudioEngine: Audio-Chunk gesendet (\(chunk.count) Samples)")
     }
@@ -325,6 +325,8 @@ class ServerAudioEngine: NSObject, ObservableObject {
     // MARK: - Cleanup
     
     deinit {
-        stopVoiceChat()
+        // Cleanup ohne Main Actor Aufruf
+        audioEngine?.stop()
+        print("🧹 ServerAudioEngine: Cleanup abgeschlossen")
     }
 }
