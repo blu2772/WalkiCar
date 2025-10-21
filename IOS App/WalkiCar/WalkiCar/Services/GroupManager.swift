@@ -71,10 +71,10 @@ class GroupManager: ObservableObject {
         }
     }
     
-    func createGroup(name: String, description: String) {
+    func createGroup(name: String, description: String, friendIds: [Int] = []) {
         Task {
             do {
-                let request = CreateGroupRequest(name: name, description: description, friendIds: [])
+                let request = CreateGroupRequest(name: name, description: description, friendIds: friendIds)
                 let response = try await apiClient.createGroup(request)
                 
                 await MainActor.run {

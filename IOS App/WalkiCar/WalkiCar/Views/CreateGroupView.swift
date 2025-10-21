@@ -137,7 +137,7 @@ struct CreateGroupView: View {
         
         groupManager.createGroup(
             name: groupName,
-            description: groupDescription.isEmpty ? nil : groupDescription,
+            description: groupDescription.isEmpty ? "" : groupDescription,
             friendIds: Array(selectedFriends)
         )
         

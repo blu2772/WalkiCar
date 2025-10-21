@@ -22,6 +22,7 @@ class ServerAudioEngine: NSObject, ObservableObject {
     // MARK: - Private Properties
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
+    private var outputNode: AVAudioOutputNode?
     private var audioSession: AVAudioSession?
     private var webSocketManager: WebSocketManager?
     
@@ -35,6 +36,10 @@ class ServerAudioEngine: NSObject, ObservableObject {
     private var audioBuffer: [Float] = []
     private let bufferSize = 1024
     private let chunkSize = 1024 // Audio-Chunk-Größe
+    
+    // Audio Output Buffer für empfangene Audio-Daten
+    private var receivedAudioBuffer: [Float] = []
+    private var audioPlayerNode: AVAudioPlayerNode?
     
     // Current Voice Chat
     private var currentGroupId: Int?
@@ -71,6 +76,14 @@ class ServerAudioEngine: NSObject, ObservableObject {
         guard let audioEngine = audioEngine else { return }
         
         inputNode = audioEngine.inputNode
+        outputNode = audioEngine.outputNode
+        
+        // Audio Player Node für empfangene Audio-Daten
+        audioPlayerNode = AVAudioPlayerNode()
+        guard let audioPlayerNode = audioPlayerNode else { return }
+        
+        audioEngine.attach(audioPlayerNode)
+        audioEngine.connect(audioPlayerNode, to: outputNode!, format: audioFormat)
         
         // Configure input node for microphone monitoring
         inputNode?.installTap(onBus: 0, bufferSize: AVAudioFrameCount(bufferSize), format: audioFormat) { [weak self] buffer, time in
@@ -143,6 +156,7 @@ class ServerAudioEngine: NSObject, ObservableObject {
         
         do {
             try audioEngine.start()
+            audioPlayerNode?.play()
             print("🎤 ServerAudioEngine: Audio gestartet")
             
             // Audio Status loggen
@@ -199,7 +213,6 @@ class ServerAudioEngine: NSObject, ObservableObject {
     
     private func sendAudioChunkToServer() {
         guard let groupId = currentGroupId,
-              let userId = currentUserId,
               audioBuffer.count >= chunkSize else { return }
         
         // Audio-Chunk extrahieren
@@ -207,14 +220,6 @@ class ServerAudioEngine: NSObject, ObservableObject {
         audioBuffer.removeFirst(chunkSize)
         
         // Audio-Chunk an Server senden
-        let audioData: [String: Any] = [
-            "groupId": groupId,
-            "audioData": chunk,
-            "timestamp": Date().timeIntervalSince1970,
-            "sampleRate": 48000,
-            "channels": 1
-        ]
-        
         webSocketManager?.sendAudioChunk(groupId: groupId, audioData: chunk)
         
         print("📡 ServerAudioEngine: Audio-Chunk gesendet (\(chunk.count) Samples)")
@@ -273,15 +278,46 @@ class ServerAudioEngine: NSObject, ObservableObject {
             guard let audioSamples = audioChunk["audioData"] as? [Float],
                   let fromUserId = audioChunk["userId"] as? Int else { continue }
             
-            // Audio abspielen (vereinfacht - in echter App würde man Audio-Mixing machen)
+            // Prüfen ob es ein Echo-Test ist (eigene Audio-Daten)
+            let isEcho = (fromUserId == currentUserId)
+            
+            if isEcho {
+                print("🔊 ServerAudioEngine: Echo-Test Audio empfangen (\(audioSamples.count) Samples)")
+            } else {
+                print("🔊 ServerAudioEngine: Audio von User \(fromUserId) empfangen (\(audioSamples.count) Samples)")
+            }
+            
+            // Audio abspielen
             playAudioSamples(audioSamples)
         }
     }
     
     private func playAudioSamples(_ samples: [Float]) {
-        // Vereinfachte Audio-Wiedergabe
-        // In einer echten App würde man hier Audio-Mixing und -Wiedergabe implementieren
-        print("🔊 ServerAudioEngine: Spiele Audio ab (\(samples.count) Samples)")
+        guard let audioPlayerNode = audioPlayerNode else { return }
+        
+        // Audio-Daten zu Buffer hinzufügen
+        receivedAudioBuffer.append(contentsOf: samples)
+        
+        // Wenn genug Daten vorhanden sind, abspielen
+        if receivedAudioBuffer.count >= chunkSize {
+            let audioBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: AVAudioFrameCount(chunkSize))!
+            audioBuffer.frameLength = AVAudioFrameCount(chunkSize)
+            
+            // Audio-Daten in Buffer kopieren
+            if let channelData = audioBuffer.floatChannelData?[0] {
+                for i in 0..<chunkSize {
+                    channelData[i] = receivedAudioBuffer[i]
+                }
+            }
+            
+            // Buffer aus dem Array entfernen
+            receivedAudioBuffer.removeFirst(chunkSize)
+            
+            // Audio abspielen
+            audioPlayerNode.scheduleBuffer(audioBuffer, at: nil, options: [], completionHandler: nil)
+            
+            print("🔊 ServerAudioEngine: Spiele Audio ab (\(chunkSize) Samples)")
+        }
     }
     
     // MARK: - Audio Status Logging

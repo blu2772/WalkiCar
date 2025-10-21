@@ -89,6 +89,9 @@ class AudioProcessor {
             participant.buffer = participant.buffer.slice(-maxBufferSize);
         }
 
+        // Debug: Audio-Chunk empfangen
+        console.log(`🎤 AudioProcessor: Audio-Chunk empfangen von User ${userId} in Room ${groupId} (${audioData.length} Samples)`);
+
         // Audio-Mixing starten wenn noch nicht aktiv
         if (!this.mixingInterval) {
             this.startAudioMixing();
@@ -121,7 +124,8 @@ class AudioProcessor {
         const timeoutMs = 1000; // 1 Sekunde Timeout für inaktive Teilnehmer
 
         for (const [groupId, room] of this.audioRooms) {
-            if (room.participants.size < 2) continue; // Mindestens 2 Teilnehmer
+            // Audio auch bei nur einem Teilnehmer verarbeiten (für Echo-Test)
+            if (room.participants.size < 1) continue;
 
             const activeParticipants = [];
             const audioData = [];
@@ -168,6 +172,16 @@ class AudioProcessor {
                         audioData: audioForUser,
                         timestamp: Date.now()
                     });
+                    console.log(`🎤 AudioProcessor: Audio an User ${userId} gesendet (${audioForUser.length} Streams)`);
+                } else if (room.participants.size === 1) {
+                    // Echo-Test: Sende eigene Audio-Daten zurück (für Single-User-Test)
+                    this.sendAudioToParticipant(participant.socketId, {
+                        groupId: groupId,
+                        audioData: audioData, // Eigene Audio-Daten für Echo-Test
+                        timestamp: Date.now(),
+                        isEcho: true
+                    });
+                    console.log(`🎤 AudioProcessor: Echo-Test Audio an User ${userId} gesendet`);
                 }
             }
         }

@@ -7,7 +7,7 @@
 
 import Foundation
 import AVFoundation
-import WebRTC
+@preconcurrency import WebRTC
 
 @MainActor
 class WebRTCAudioEngine: NSObject, ObservableObject {
@@ -54,7 +54,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             // Audio Session für WebRTC Voice Chat optimieren
             try audioSession?.setCategory(.playAndRecord, mode: .voiceChat, options: [
                 .defaultToSpeaker,
-                .allowBluetooth,
+                .allowBluetoothHFP,
                 .allowBluetoothA2DP,
                 .duckOthers,
                 .interruptSpokenAudioAndMixWithOthers
@@ -119,7 +119,7 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             print("🔊 WebRTCAudioEngine: Konfiguriere Audio Session für WebRTC...")
             try audioSession?.setCategory(.playAndRecord, mode: .voiceChat, options: [
                 .defaultToSpeaker,
-                .allowBluetooth,
+                .allowBluetoothHFP,
                 .allowBluetoothA2DP,
                 .duckOthers,
                 .interruptSpokenAudioAndMixWithOthers
@@ -317,7 +317,6 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         guard let peerConnection = peerConnection else {
             print("❌ WebRTCAudioEngine: Peer Connection konnte nicht erstellt werden")
             print("❌ WebRTCAudioEngine: Debug - ICE Servers: \(configuration.iceServers.count)")
-            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.mandatoryConstraints)")
             return nil
         }
         

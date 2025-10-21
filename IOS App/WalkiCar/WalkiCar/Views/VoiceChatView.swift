@@ -93,7 +93,7 @@ struct VoiceChatView: View {
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showingCreateGroup) {
-            CreateGroupView()
+            CreateGroupView(groupManager: groupManager, friendsManager: friendsManager)
         }
         .onAppear {
             groupManager.loadGroups()
@@ -117,7 +117,7 @@ struct VoiceChatView: View {
         
         // Server-basierte Audio-Übertragung stoppen
         serverAudioEngine.stopVoiceChat()
-        groupManager.leaveVoiceChat()
+        groupManager.leaveVoiceChat(group: group)
     }
 }
 
