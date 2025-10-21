@@ -276,12 +276,10 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         let configuration = RTCConfiguration()
         
-        // ICE Servers mit TURN Server - Korrekte Konfiguration für Coturn-Server
+        // ICE Servers - Vereinfachte Konfiguration für bessere Kompatibilität
         configuration.iceServers = [
-            // STUN Server für NAT-Traversal
+            // Google STUN Server (zuverlässig)
             RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
-            RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"]),
-            RTCIceServer(urlStrings: ["stun:stun2.l.google.com:19302"]),
             
             // Lokaler STUN Server
             RTCIceServer(urlStrings: ["stun:walkcar.timrmp.de:3478"]),
@@ -289,13 +287,6 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
             // TURN Server für Internet-Verbindungen (UDP/TCP)
             RTCIceServer(
                 urlStrings: ["turn:walkcar.timrmp.de:3478"],
-                username: "walkcar",
-                credential: "walkcar123"
-            ),
-            
-            // TURN Server mit TLS für sichere Verbindungen
-            RTCIceServer(
-                urlStrings: ["turns:walkcar.timrmp.de:5349"],
                 username: "walkcar",
                 credential: "walkcar123"
             )
@@ -326,6 +317,8 @@ class WebRTCAudioEngine: NSObject, ObservableObject {
         
         guard let peerConnection = peerConnection else {
             print("❌ WebRTCAudioEngine: Peer Connection konnte nicht erstellt werden")
+            print("❌ WebRTCAudioEngine: Debug - ICE Servers: \(configuration.iceServers.count)")
+            print("❌ WebRTCAudioEngine: Debug - Constraints: \(constraints.mandatoryConstraints)")
             return nil
         }
         

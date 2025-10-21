@@ -21,6 +21,7 @@ const crypto = require('crypto');
 
 const { connectDB } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
+const AudioProcessor = require('./services/audioProcessor');
 
 const app = express();
 
@@ -93,6 +94,17 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Audio-Processor initialisieren
+const audioProcessor = new AudioProcessor();
+
+// Audio-Processor mit Socket.IO verbinden
+audioProcessor.sendAudioToParticipant = (socketId, audioPacket) => {
+  const socket = io.sockets.sockets.get(socketId);
+  if (socket) {
+    socket.emit('audio-data', audioPacket);
+  }
+};
 
 // Security middleware
 app.use(helmet());
@@ -336,8 +348,67 @@ io.on('connection', (socket) => {
     console.log(`User ${socket.id} left room ${roomId}`);
   });
   
+  // Audio-Data Event - Server-basierte Audio-Übertragung
+  socket.on('audio-chunk', async (data) => {
+    try {
+      const { groupId, audioData } = data;
+      const userId = socket.userId;
+      
+      if (!userId || !groupId || !audioData) {
+        console.log('❌ Audio-Chunk: Ungültige Daten');
+        return;
+      }
+      
+      // Audio-Daten an Audio-Processor weiterleiten
+      audioProcessor.receiveAudioChunk(groupId, userId, audioData, socket.id);
+      
+    } catch (error) {
+      console.error('❌ Error processing audio chunk:', error);
+    }
+  });
+
+  // Audio-Room Status abrufen
+  socket.on('get_audio_room_status', async (data) => {
+    try {
+      const { groupId } = data;
+      const status = audioProcessor.getRoomStatus(groupId);
+      
+      socket.emit('audio_room_status', {
+        groupId: groupId,
+        status: status
+      });
+      
+    } catch (error) {
+      console.error('❌ Error getting audio room status:', error);
+    }
+  });
+
+  // Alle Audio-Rooms Status abrufen (Admin)
+  socket.on('get_all_audio_rooms', async () => {
+    try {
+      const rooms = audioProcessor.getAllRoomsStatus();
+      
+      socket.emit('all_audio_rooms', {
+        rooms: rooms,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Error getting all audio rooms:', error);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('🔌 Socket.IO: Benutzer getrennt:', socket.id);
+    
+    // Audio-Processor: Alle Teilnehmer dieses Sockets entfernen
+    if (socket.userId) {
+      for (const [groupId, room] of audioProcessor.audioRooms) {
+        if (room.audioBuffers.has(socket.userId)) {
+          audioProcessor.removeParticipant(groupId, socket.userId);
+        }
+      }
+    }
   });
   
   // Location tracking events
@@ -417,14 +488,17 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Voice Chat Events
+  // Voice Chat Events - Server-basierte Audio-Übertragung
   socket.on('join_group_voice_chat', async (data) => {
     try {
       const { userId, groupId } = data;
-      console.log(`User ${userId} joining group voice chat ${groupId}`);
+      console.log(`🎤 User ${userId} joining group voice chat ${groupId}`);
       
       // Join group voice chat room
       socket.join(`group_voice_${groupId}`);
+      
+      // Audio-Processor: Teilnehmer hinzufügen
+      audioProcessor.addParticipant(groupId, userId, socket.id);
       
       // Broadcast to other group members that user joined voice chat
       socket.to(`group_voice_${groupId}`).emit('user_joined_voice_chat', {
@@ -440,8 +514,10 @@ io.on('connection', (socket) => {
         timestamp: new Date().toISOString()
       });
       
+      console.log(`✅ User ${userId} erfolgreich zu Voice Chat ${groupId} hinzugefügt`);
+      
     } catch (error) {
-      console.error('Error joining group voice chat:', error);
+      console.error('❌ Error joining group voice chat:', error);
       socket.emit('voice_chat_error', { error: error.message });
     }
   });
@@ -449,10 +525,13 @@ io.on('connection', (socket) => {
   socket.on('leave_group_voice_chat', async (data) => {
     try {
       const { userId, groupId } = data;
-      console.log(`User ${userId} leaving group voice chat ${groupId}`);
+      console.log(`🎤 User ${userId} leaving group voice chat ${groupId}`);
       
       // Leave group voice chat room
       socket.leave(`group_voice_${groupId}`);
+      
+      // Audio-Processor: Teilnehmer entfernen
+      audioProcessor.removeParticipant(groupId, userId);
       
       // Broadcast to other group members that user left voice chat
       socket.to(`group_voice_${groupId}`).emit('user_left_voice_chat', {
@@ -470,8 +549,10 @@ io.on('connection', (socket) => {
         });
       }
       
+      console.log(`✅ User ${userId} erfolgreich aus Voice Chat ${groupId} entfernt`);
+      
     } catch (error) {
-      console.error('Error leaving group voice chat:', error);
+      console.error('❌ Error leaving group voice chat:', error);
       socket.emit('voice_chat_error', { error: error.message });
     }
   });
@@ -639,6 +720,11 @@ const startServer = async () => {
   }
 };
 
+// Cleanup-Timer für inaktive Audio-Teilnehmer
+setInterval(() => {
+  audioProcessor.cleanupInactiveParticipants();
+}, 30000); // Alle 30 Sekunden
+
 startServer();
 
-module.exports = { app, io };
+module.exports = { app, io, audioProcessor };

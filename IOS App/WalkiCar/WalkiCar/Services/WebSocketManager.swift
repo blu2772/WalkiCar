@@ -233,6 +233,37 @@ class WebSocketManager: ObservableObject {
             }
         }
         
+        // Server-basierte Audio-Events
+        socket.on("audio-data") { [weak self] data, ack in
+            print("📡 WebSocketManager: Audio-Daten erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioDataReceived"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("audio_room_status") { [weak self] data, ack in
+            print("📊 WebSocketManager: Audio-Room-Status erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioRoomStatusReceived"),
+                    object: data.first
+                )
+            }
+        }
+        
+        socket.on("all_audio_rooms") { [weak self] data, ack in
+            print("📊 WebSocketManager: Alle Audio-Rooms erhalten")
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AllAudioRoomsReceived"),
+                    object: data.first
+                )
+            }
+        }
+        
         // WebRTC Signaling Events
         socket.on("webrtc_offer") { [weak self] data, ack in
             print("🎤 WebSocketManager: WebRTC Offer erhalten - Data: \(data)")
@@ -466,6 +497,50 @@ class WebSocketManager: ObservableObject {
         
         socket.emit("test_event", ["message": "Test von iOS App"])
         print("🧪 WebSocketManager: Test-Event gesendet")
+    }
+    
+    // MARK: - Server-basierte Audio-Übertragung
+    
+    func sendAudioChunk(groupId: Int, audioData: [Float]) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden für Audio-Chunk")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "groupId": groupId,
+            "audioData": audioData,
+            "timestamp": Date().timeIntervalSince1970,
+            "sampleRate": 48000,
+            "channels": 1
+        ]
+        
+        socket.emit("audio-chunk", data)
+        print("📡 WebSocketManager: Audio-Chunk gesendet (\(audioData.count) Samples)")
+    }
+    
+    func getAudioRoomStatus(groupId: Int) {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden für Audio-Room-Status")
+            return
+        }
+        
+        let data: [String: Any] = [
+            "groupId": groupId
+        ]
+        
+        socket.emit("get_audio_room_status", data)
+        print("📊 WebSocketManager: Audio-Room-Status angefordert für Gruppe \(groupId)")
+    }
+    
+    func getAllAudioRooms() {
+        guard let socket = socket, isConnected else {
+            print("❌ WebSocketManager: Socket nicht verbunden für alle Audio-Rooms")
+            return
+        }
+        
+        socket.emit("get_all_audio_rooms")
+        print("📊 WebSocketManager: Alle Audio-Rooms angefordert")
     }
     
     // MARK: - WebRTC Signaling Methods
