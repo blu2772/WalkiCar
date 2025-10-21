@@ -101,13 +101,23 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting - weniger restriktiv für Login-Versuche
+const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 200, // erhöht auf 200 requests per windowMs
   message: 'Zu viele Anfragen von dieser IP, bitte versuchen Sie es später erneut.'
 });
-app.use('/api/', limiter);
+
+// Spezielle Rate Limiting für Auth-Endpoints - weniger restriktiv
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // 50 Login-Versuche pro 15 Minuten pro IP
+  message: 'Zu viele Anmeldeversuche von dieser IP, bitte versuchen Sie es später erneut.',
+  skipSuccessfulRequests: true // Zähle nur fehlgeschlagene Versuche
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth/', authLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

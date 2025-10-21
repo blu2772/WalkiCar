@@ -17,6 +17,7 @@ struct EmailRegisterView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var showingSuccess = false
+    @State private var showingError = false
     
     // Callback für Navigation zum Login
     let onShowLogin: () -> Void
@@ -139,12 +140,16 @@ struct EmailRegisterView: View {
         } message: {
             Text("Dein Konto wurde erstellt. Bitte überprüfe deine E-Mails zur Verifizierung.")
         }
-        .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
+        .alert("Fehler", isPresented: $showingError) {
             Button("OK") {
                 authManager.errorMessage = nil
+                showingError = false
             }
         } message: {
             Text(authManager.errorMessage ?? "")
+        }
+        .onChange(of: authManager.errorMessage) { errorMessage in
+            showingError = errorMessage != nil
         }
     }
     

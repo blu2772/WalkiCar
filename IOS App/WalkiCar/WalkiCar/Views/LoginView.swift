@@ -12,6 +12,7 @@ struct LoginView: View {
     @StateObject private var authManager = AuthManager.shared
     @State private var showingEmailLogin = false
     @State private var showingEmailRegister = false
+    @State private var showingError = false
     
     var body: some View {
         ZStack {
@@ -135,12 +136,16 @@ struct LoginView: View {
                 showingEmailLogin = true
             }
         }
-        .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
+        .alert("Fehler", isPresented: $showingError) {
             Button("OK") {
                 authManager.errorMessage = nil
+                showingError = false
             }
         } message: {
             Text(authManager.errorMessage ?? "")
+        }
+        .onChange(of: authManager.errorMessage) { errorMessage in
+            showingError = errorMessage != nil
         }
     }
 }

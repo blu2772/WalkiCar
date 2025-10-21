@@ -14,6 +14,7 @@ struct EmailLoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showingForgotPassword = false
+    @State private var showingError = false
     
     // Callback für Navigation zur Registrierung
     let onShowRegister: () -> Void
@@ -108,12 +109,16 @@ struct EmailLoginView: View {
         .sheet(isPresented: $showingForgotPassword) {
             ForgotPasswordView()
         }
-        .alert("Fehler", isPresented: .constant(authManager.errorMessage != nil)) {
+        .alert("Fehler", isPresented: $showingError) {
             Button("OK") {
                 authManager.errorMessage = nil
+                showingError = false
             }
         } message: {
             Text(authManager.errorMessage ?? "")
+        }
+        .onChange(of: authManager.errorMessage) { errorMessage in
+            showingError = errorMessage != nil
         }
     }
     
