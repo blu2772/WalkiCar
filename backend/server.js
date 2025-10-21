@@ -351,11 +351,17 @@ io.on('connection', (socket) => {
   // Audio-Data Event - Server-basierte Audio-Übertragung
   socket.on('audio-chunk', async (data) => {
     try {
+      console.log('🎤 Server: Audio-Chunk Event empfangen!', { 
+        userId: socket.userId, 
+        groupId: data?.groupId, 
+        audioDataLength: data?.audioData?.length 
+      });
+      
       const { groupId, audioData } = data;
       const userId = socket.userId;
       
       if (!userId || !groupId || !audioData) {
-        console.log('❌ Audio-Chunk: Ungültige Daten');
+        console.log('❌ Audio-Chunk: Ungültige Daten', { userId, groupId, audioDataLength: audioData?.length });
         return;
       }
       

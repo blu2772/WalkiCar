@@ -58,13 +58,18 @@ class ServerAudioEngine: NSObject, ObservableObject {
         audioSession = AVAudioSession.sharedInstance()
         
         do {
-            try audioSession?.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker])
+            // Audio-Session für Voice Chat konfigurieren
+            try audioSession?.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession?.setPreferredSampleRate(48000)
+            try audioSession?.setPreferredIOBufferDuration(0.005) // 5ms Buffer für niedrige Latenz
             try audioSession?.setActive(true)
             
             print("🎤 ServerAudioEngine: Audio Session konfiguriert")
             print("🔊 ServerAudioEngine: Audio Route: \(audioSession?.currentRoute.outputs.first?.portType.rawValue ?? "Unknown")")
             print("🎤 ServerAudioEngine: Sample Rate: \(audioSession?.sampleRate ?? 0)")
             print("🎤 ServerAudioEngine: Buffer Duration: \(audioSession?.ioBufferDuration ?? 0)")
+            print("🎤 ServerAudioEngine: Input Available: \(audioSession?.isInputAvailable ?? false)")
+            print("🎤 ServerAudioEngine: Output Available: \(audioSession?.outputVolume ?? 0)")
         } catch {
             print("❌ ServerAudioEngine: Audio Session Setup Fehler: \(error)")
         }
@@ -175,7 +180,10 @@ class ServerAudioEngine: NSObject, ObservableObject {
     // MARK: - Audio Processing
     
     private func processAudioInput(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        guard let channelData = buffer.floatChannelData?[0] else { return }
+        guard let channelData = buffer.floatChannelData?[0] else { 
+            print("❌ ServerAudioEngine: Keine Channel-Daten verfügbar")
+            return 
+        }
         let frameCount = Int(buffer.frameLength)
         
         // Audio Level berechnen
@@ -185,9 +193,16 @@ class ServerAudioEngine: NSObject, ObservableObject {
             self.audioLevel = audioLevel
         }
         
+        // Debug: Audio-Input verarbeitet
+        if frameCount > 0 {
+            print("🎤 ServerAudioEngine: Audio-Input verarbeitet (\(frameCount) Frames, Level: \(audioLevel))")
+        }
+        
         // Audio-Daten für Server-Übertragung sammeln
         if isRecording && isMicrophoneEnabled {
             collectAudioForTransmission(channelData: channelData, frameCount: frameCount)
+        } else {
+            print("🎤 ServerAudioEngine: Audio-Aufnahme deaktiviert (Recording: \(isRecording), Mic: \(isMicrophoneEnabled))")
         }
     }
     
@@ -204,6 +219,8 @@ class ServerAudioEngine: NSObject, ObservableObject {
         for i in 0..<frameCount {
             audioBuffer.append(channelData[i])
         }
+        
+        print("🎤 ServerAudioEngine: Audio-Buffer gefüllt (\(audioBuffer.count)/\(chunkSize))")
         
         // Wenn Buffer voll ist, an Server senden
         if audioBuffer.count >= chunkSize {
@@ -257,11 +274,19 @@ class ServerAudioEngine: NSObject, ObservableObject {
     }
     
     @objc private func handleAudioData(_ notification: Notification) {
-        guard let audioPacket = notification.object as? [String: Any],
-              let audioData = audioPacket["audioData"] as? [[String: Any]] else { return }
+        guard let audioPacket = notification.object as? [String: Any] else { 
+            print("❌ ServerAudioEngine: Ungültiges Audio-Packet Format")
+            return 
+        }
+        
+        print("📡 ServerAudioEngine: Audio-Packet empfangen: \(audioPacket)")
         
         // Audio-Daten verarbeiten und abspielen
-        processReceivedAudio(audioData: audioData)
+        if let audioData = audioPacket["audioData"] as? [[String: Any]] {
+            processReceivedAudio(audioData: audioData)
+        } else {
+            print("❌ ServerAudioEngine: Audio-Daten nicht im erwarteten Format")
+        }
     }
     
     @objc private func handleUserJoinedVoice(_ notification: Notification) {
@@ -273,10 +298,17 @@ class ServerAudioEngine: NSObject, ObservableObject {
     }
     
     private func processReceivedAudio(audioData: [[String: Any]]) {
+        print("🔊 ServerAudioEngine: Verarbeite \(audioData.count) Audio-Chunks")
+        
         // Audio-Daten von anderen Teilnehmern verarbeiten
-        for audioChunk in audioData {
+        for (index, audioChunk) in audioData.enumerated() {
+            print("🔊 ServerAudioEngine: Chunk \(index): \(audioChunk)")
+            
             guard let audioSamples = audioChunk["audioData"] as? [Float],
-                  let fromUserId = audioChunk["userId"] as? Int else { continue }
+                  let fromUserId = audioChunk["userId"] as? Int else { 
+                print("❌ ServerAudioEngine: Ungültiger Audio-Chunk \(index)")
+                continue 
+            }
             
             // Prüfen ob es ein Echo-Test ist (eigene Audio-Daten)
             let isEcho = (fromUserId == currentUserId)
@@ -293,7 +325,12 @@ class ServerAudioEngine: NSObject, ObservableObject {
     }
     
     private func playAudioSamples(_ samples: [Float]) {
-        guard let audioPlayerNode = audioPlayerNode else { return }
+        guard let audioPlayerNode = audioPlayerNode else { 
+            print("❌ ServerAudioEngine: audioPlayerNode ist nil")
+            return 
+        }
+        
+        print("🔊 ServerAudioEngine: Spiele \(samples.count) Audio-Samples ab")
         
         // Audio-Daten zu Buffer hinzufügen
         receivedAudioBuffer.append(contentsOf: samples)
@@ -316,7 +353,9 @@ class ServerAudioEngine: NSObject, ObservableObject {
             // Audio abspielen
             audioPlayerNode.scheduleBuffer(audioBuffer, at: nil, options: [], completionHandler: nil)
             
-            print("🔊 ServerAudioEngine: Spiele Audio ab (\(chunkSize) Samples)")
+            print("🔊 ServerAudioEngine: Audio-Buffer geplant (\(chunkSize) Samples)")
+        } else {
+            print("🔊 ServerAudioEngine: Warte auf mehr Audio-Daten (\(receivedAudioBuffer.count)/\(chunkSize))")
         }
     }
     
